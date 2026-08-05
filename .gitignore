@@ -1,0 +1,5 @@
+# Local one-time setup only — not part of the public deployed app.
+# Contains Sheraton's real item list and negotiated prices; never commit this.
+js/catalog-sheraton.js
+seed.html
+js/seed.js

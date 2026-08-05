@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LaundroPlus — Bill &amp; Pack</title>
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="view-login">
+  <form class="login-card" id="login-form">
+    <h1>LaundroPlus</h1>
+    <p>Bill &amp; Pack — sign in to continue</p>
+    <label for="login-email">Email</label>
+    <input type="email" id="login-email" autocomplete="username" required>
+    <label for="login-password">Password</label>
+    <input type="password" id="login-password" autocomplete="current-password" required>
+    <button type="submit">Sign in</button>
+    <div id="login-error"></div>
+  </form>
+</div>
+
+<!-- APP -->
+<div id="view-app" class="hidden">
+  <header class="topbar">
+    <div class="brand"><h1>LaundroPlus</h1><span>Bill &amp; Pack</span></div>
+    <div class="topbar-right">
+      <span id="user-email"></span>
+      <button id="btn-logout">Sign out</button>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="neworder">New Order</button>
+    <button class="tab-btn" data-tab="orders">Orders</button>
+  </nav>
+
+  <main>
+    <!-- NEW ORDER -->
+    <section id="tab-neworder">
+      <div class="order-layout">
+        <div>
+          <div class="panel">
+            <h2>Order details</h2>
+            <div class="field-row">
+              <div class="field">
+                <label for="f-customer">Customer</label>
+                <select id="f-customer"><option value="sheraton">Sheraton</option></select>
+              </div>
+              <div class="field">
+                <label for="f-room">Room / bill number</label>
+                <input type="text" id="f-room" placeholder="e.g. 1602 or guest name">
+              </div>
+              <div class="field">
+                <label for="f-service">Service type</label>
+                <select id="f-service"></select>
+              </div>
+              <div class="field">
+                <label for="f-pickup">Pickup / delivery fee (optional)</label>
+                <input type="number" id="f-pickup" min="0" step="1" placeholder="0">
+              </div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h2>Items</h2>
+            <div id="item-picker"></div>
+          </div>
+        </div>
+
+        <div>
+          <div class="panel" style="position:sticky; top:20px;">
+            <h2>Summary</h2>
+            <div class="summary-line"><span class="k">Total pieces</span><span id="s-pieces">0</span></div>
+            <div class="summary-line"><span class="k">Standard value</span><span id="s-standard">Rs 0</span></div>
+            <div class="summary-line"><span class="k">Service surcharge</span><span id="s-surcharge">Rs 0</span></div>
+            <div class="summary-line"><span class="k">Pickup / delivery</span><span id="s-pickup">Rs 0</span></div>
+            <div class="summary-line total"><span class="k">Total bill value</span><span id="s-total">Rs 0</span></div>
+            <button class="btn-primary" id="btn-save-print">Save &amp; print docket</button>
+            <div id="save-msg"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ORDERS -->
+    <section id="tab-orders" class="hidden">
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Docket</th><th>Date</th><th>Room / bill no.</th><th>Service</th>
+              <th>Pieces</th><th>Total (Rs)</th><th>Status</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="orders-tbody"></tbody>
+        </table>
+        <div id="orders-empty" class="empty-state hidden">No orders yet — save one from the New Order tab.</div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- PRINT DOCKET (populated by JS, only visible when printing) -->
+<div id="print-docket">
+  <div class="docket">
+    <div class="d-head">
+      <div class="d-brand">LaundroPlus<small>Guest Laundry — Packing Docket</small></div>
+      <div class="d-ref" id="d-ref"></div>
+    </div>
+    <div class="d-meta">
+      <span id="d-customer"></span>
+      <span id="d-service"></span>
+    </div>
+    <table>
+      <thead><tr><th>Item</th><th style="text-align:right">Qty</th><th style="text-align:right">Rate</th><th style="text-align:right">Amount</th></tr></thead>
+      <tbody id="d-lines"></tbody>
+    </table>
+    <div class="d-total"><span id="d-total-label">Total</span><span id="d-total-value"></span></div>
+    <div class="d-foot"><span>Packed by: ______________</span><span>Checked by: ______________</span></div>
+  </div>
+</div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
