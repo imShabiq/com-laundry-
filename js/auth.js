@@ -1,16 +1,18 @@
-import {
-  signInWithEmailAndPassword, signOut, onAuthStateChanged,
-} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
-import { auth } from "./firebase-init.js";
+import { supabase } from "./supabase-init.js";
 
-export function login(email, password) {
-  return signInWithEmailAndPassword(auth, email, password);
+export async function login(email, password) {
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) throw error;
 }
 
-export function logout() {
-  return signOut(auth);
+export async function logout() {
+  await supabase.auth.signOut();
 }
 
 export function watchAuth(callback) {
-  return onAuthStateChanged(auth, callback);
+  supabase.auth.getSession().then(({ data }) => callback(data.session?.user ?? null));
+  const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+    callback(session?.user ?? null);
+  });
+  return () => sub.subscription.unsubscribe();
 }

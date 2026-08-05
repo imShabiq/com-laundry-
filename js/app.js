@@ -1,10 +1,9 @@
 import { watchAuth, login, logout } from "./auth.js";
-import { getCustomer, createOrder, makeDocketNo, subscribeOrders, updateOrderStatus } from "./db.js";
+import { getCustomer, createOrder, makeDocketNo, fetchOrders, updateOrderStatus } from "./db.js";
 import { SERVICE_TYPES, statusLabel } from "./constants.js";
 
 const CUSTOMER_ID = "sheraton";
 let customer = null;
-let ordersUnsub = null;
 
 // ---------- Auth ----------
 const viewLogin = document.getElementById("view-login");
@@ -35,7 +34,6 @@ watchAuth(async (user) => {
   } else {
     viewApp.classList.add("hidden");
     viewLogin.classList.remove("hidden");
-    if (ordersUnsub) { ordersUnsub(); ordersUnsub = null; }
   }
 });
 
@@ -46,8 +44,16 @@ document.querySelectorAll(".tab-btn").forEach((btn) => {
     btn.classList.add("active");
     document.querySelectorAll("main > section").forEach((s) => s.classList.add("hidden"));
     document.getElementById(`tab-${btn.dataset.tab}`).classList.remove("hidden");
+    if (btn.dataset.tab === "orders") refreshOrders();
   });
 });
+
+async function refreshOrders() {
+  const orders = await fetchOrders(CUSTOMER_ID);
+  renderOrders(orders);
+}
+
+document.getElementById("btn-refresh-orders").addEventListener("click", refreshOrders);
 
 // ---------- Init customer + build item picker ----------
 async function initCustomerAndUI() {
@@ -67,12 +73,10 @@ async function initCustomerAndUI() {
     serviceSelect.appendChild(opt);
   });
 
-  buildItemPicker(customer.catalog || SHERATON_CATALOG);
+  buildItemPicker(customer.catalog);
   wireSummaryRecalc();
   recalcSummary();
-
-  if (ordersUnsub) ordersUnsub();
-  ordersUnsub = subscribeOrders(CUSTOMER_ID, renderOrders);
+  await refreshOrders();
 }
 
 function buildItemPicker(catalog) {
@@ -188,6 +192,7 @@ document.getElementById("btn-save-print").addEventListener("click", async () => 
     saveMsg.textContent = `Saved — docket ${docketNo}`;
     saveMsg.className = "ok";
     resetForm();
+    refreshOrders();
   } catch (err) {
     saveMsg.textContent = "Could not save — check connection and try again.";
     saveMsg.className = "err";
@@ -255,12 +260,12 @@ function renderOrders(orders) {
     if (o.status === "received") {
       const b = document.createElement("button");
       b.textContent = "Mark packed";
-      b.addEventListener("click", () => updateOrderStatus(o.id, "packed"));
+      b.addEventListener("click", () => updateOrderStatus(o.id, "packed").then(refreshOrders));
       actions.appendChild(b);
     } else if (o.status === "packed") {
       const b = document.createElement("button");
       b.textContent = "Mark dispatched";
-      b.addEventListener("click", () => updateOrderStatus(o.id, "dispatched"));
+      b.addEventListener("click", () => updateOrderStatus(o.id, "dispatched").then(refreshOrders));
       actions.appendChild(b);
     }
 
