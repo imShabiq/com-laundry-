@@ -54,8 +54,26 @@
           <input type="file" id="import-file" accept=".xlsx,.xlsm,.xls">
           <div id="import-status"></div>
           <div id="import-preview" class="hidden">
+            <div class="filter-bar">
+              <div class="field">
+                <label for="import-from">From date</label>
+                <input type="date" id="import-from">
+              </div>
+              <div class="field">
+                <label for="import-to">To date</label>
+                <input type="date" id="import-to">
+              </div>
+              <button class="btn-ghost" id="btn-import-clear-filter">Clear filter</button>
+              <span class="filter-count" id="import-filter-count"></span>
+            </div>
             <table>
-              <thead><tr><th>Docket</th><th>Date</th><th>Room / bill no.</th><th>Service</th><th>Pieces</th><th>Total (Rs)</th></tr></thead>
+              <thead>
+                <tr>
+                  <th>Docket</th>
+                  <th class="sortable" id="import-sort-date">Date <span id="import-sort-icon">↓</span></th>
+                  <th>Room / bill no.</th><th>Service</th><th>Pieces</th><th>Total (Rs)</th>
+                </tr>
+              </thead>
               <tbody id="import-preview-body"></tbody>
             </table>
             <button class="btn-primary" id="btn-confirm-import">Import &amp; print QR tags</button>

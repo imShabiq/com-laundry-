@@ -257,6 +257,8 @@ function printDocket(order) {
 
 // ---------- Import from Excel ----------
 let pendingImport = [];
+let visibleImport = [];
+let importSortDir = "asc";
 
 document.getElementById("import-file").addEventListener("change", async (e) => {
   const file = e.target.files[0];
@@ -274,32 +276,71 @@ document.getElementById("import-file").addEventListener("change", async (e) => {
       return;
     }
     status.textContent = `Read "${sheetName}" — found ${orders.length} bill${orders.length === 1 ? "" : "s"}. Review below, then import.`;
-    const tbody = document.getElementById("import-preview-body");
-    tbody.innerHTML = "";
-    orders.forEach((o) => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `<td>${o.docketNo}</td><td>${o.orderDate}</td><td>${o.roomOrBillNo}</td><td>${o.serviceType.name}</td><td class="num">${o.totalPieces}</td><td class="num">${o.totalBillValue}</td>`;
-      tbody.appendChild(tr);
-    });
+
+    const dates = orders.map((o) => o.orderDate).sort();
+    document.getElementById("import-from").value = "";
+    document.getElementById("import-to").value = "";
+    document.getElementById("import-from").min = dates[0] || "";
+    document.getElementById("import-from").max = dates[dates.length - 1] || "";
+    document.getElementById("import-to").min = dates[0] || "";
+    document.getElementById("import-to").max = dates[dates.length - 1] || "";
+    importSortDir = "asc";
+
+    renderImportPreview();
     preview.classList.remove("hidden");
   } catch (err) {
     status.textContent = "Could not read that file — check it's the Production Summary workbook.";
   }
 });
 
+function renderImportPreview() {
+  const from = document.getElementById("import-from").value;
+  const to = document.getElementById("import-to").value;
+
+  visibleImport = pendingImport
+    .filter((o) => (!from || o.orderDate >= from) && (!to || o.orderDate <= to))
+    .sort((a, b) => (a.orderDate < b.orderDate ? -1 : a.orderDate > b.orderDate ? 1 : 0) * (importSortDir === "asc" ? 1 : -1));
+
+  document.getElementById("import-sort-icon").textContent = importSortDir === "asc" ? "↓" : "↑";
+  document.getElementById("import-filter-count").textContent =
+    from || to ? `Showing ${visibleImport.length} of ${pendingImport.length} bills` : `${pendingImport.length} bills`;
+
+  const tbody = document.getElementById("import-preview-body");
+  tbody.innerHTML = "";
+  visibleImport.forEach((o) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${o.docketNo}</td><td>${o.orderDate}</td><td>${o.roomOrBillNo}</td><td>${o.serviceType.name}</td><td class="num">${o.totalPieces}</td><td class="num">${o.totalBillValue}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+document.getElementById("import-from").addEventListener("change", renderImportPreview);
+document.getElementById("import-to").addEventListener("change", renderImportPreview);
+document.getElementById("btn-import-clear-filter").addEventListener("click", () => {
+  document.getElementById("import-from").value = "";
+  document.getElementById("import-to").value = "";
+  renderImportPreview();
+});
+document.getElementById("import-sort-date").addEventListener("click", () => {
+  importSortDir = importSortDir === "asc" ? "desc" : "asc";
+  renderImportPreview();
+});
+
 document.getElementById("btn-confirm-import").addEventListener("click", async () => {
   const status = document.getElementById("import-status");
   const btn = document.getElementById("btn-confirm-import");
+  if (visibleImport.length === 0) { status.textContent = "No bills in the current filter to import."; return; }
   btn.disabled = true;
   status.textContent = "Importing…";
   try {
-    const created = await createOrders(pendingImport);
+    const created = await createOrders(visibleImport);
     status.textContent = `Imported ${created.length} bills. Preparing QR tags to print…`;
     await printTagSheet(created);
     status.textContent = `Imported and tagged ${created.length} bills. Attach a tag to each bag before wash.`;
     document.getElementById("import-preview").classList.add("hidden");
     document.getElementById("import-file").value = "";
     pendingImport = [];
+    visibleImport = [];
   } catch (err) {
     status.textContent = "Import failed — check connection and try again.";
   } finally {
