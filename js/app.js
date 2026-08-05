@@ -1,6 +1,9 @@
 import { watchAuth, login, logout } from "./auth.js";
-import { getCustomer, createOrder, makeDocketNo, fetchOrders, updateOrderStatus } from "./db.js";
+import { getCustomer, createOrder, createOrders, getOrderByDocketNo, makeDocketNo, fetchOrders, updateOrderStatus } from "./db.js";
 import { SERVICE_TYPES, statusLabel } from "./constants.js";
+import { parseProductionSummary } from "./xlsx-import.js";
+import { qrDataUrl } from "./qr.js";
+import { printElement } from "./print.js";
 
 const CUSTOMER_ID = "sheraton";
 let customer = null;
@@ -45,6 +48,7 @@ document.querySelectorAll(".tab-btn").forEach((btn) => {
     document.querySelectorAll("main > section").forEach((s) => s.classList.add("hidden"));
     document.getElementById(`tab-${btn.dataset.tab}`).classList.remove("hidden");
     if (btn.dataset.tab === "orders") refreshOrders();
+    if (btn.dataset.tab === "pack") document.getElementById("scan-input").focus();
   });
 });
 
@@ -228,7 +232,130 @@ function printDocket(order) {
   document.getElementById("d-total-label").textContent = `Total — ${order.totalPieces} pcs`;
   document.getElementById("d-total-value").textContent = `Rs ${order.totalBillValue}`;
 
-  window.print();
+  printElement("print-docket", "size:A4; margin:16mm;");
+}
+
+// ---------- Import from Excel ----------
+let pendingImport = [];
+
+document.getElementById("import-file").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  const status = document.getElementById("import-status");
+  const preview = document.getElementById("import-preview");
+  preview.classList.add("hidden");
+  if (!file) return;
+
+  status.textContent = "Reading file…";
+  try {
+    const { orders, warnings, sheetName } = await parseProductionSummary(file, customer);
+    pendingImport = orders;
+    if (warnings.length) {
+      status.textContent = warnings.join(" ");
+      return;
+    }
+    status.textContent = `Read "${sheetName}" — found ${orders.length} bill${orders.length === 1 ? "" : "s"}. Review below, then import.`;
+    const tbody = document.getElementById("import-preview-body");
+    tbody.innerHTML = "";
+    orders.forEach((o) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${o.docketNo}</td><td>${o.orderDate}</td><td>${o.roomOrBillNo}</td><td>${o.serviceType.name}</td><td class="num">${o.totalPieces}</td><td class="num">${o.totalBillValue}</td>`;
+      tbody.appendChild(tr);
+    });
+    preview.classList.remove("hidden");
+  } catch (err) {
+    status.textContent = "Could not read that file — check it's the Production Summary workbook.";
+  }
+});
+
+document.getElementById("btn-confirm-import").addEventListener("click", async () => {
+  const status = document.getElementById("import-status");
+  const btn = document.getElementById("btn-confirm-import");
+  btn.disabled = true;
+  status.textContent = "Importing…";
+  try {
+    const created = await createOrders(pendingImport);
+    status.textContent = `Imported ${created.length} bills. Preparing QR tags to print…`;
+    await printTagSheet(created);
+    status.textContent = `Imported and tagged ${created.length} bills. Attach a tag to each bag before wash.`;
+    document.getElementById("import-preview").classList.add("hidden");
+    document.getElementById("import-file").value = "";
+    pendingImport = [];
+  } catch (err) {
+    status.textContent = "Import failed — check connection and try again.";
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+async function printTagSheet(orders) {
+  const grid = document.getElementById("tag-grid");
+  grid.innerHTML = "";
+  for (const o of orders) {
+    const qr = await qrDataUrl(o.docketNo);
+    const tag = document.createElement("div");
+    tag.className = "tag";
+    tag.innerHTML = `
+      <img src="${qr}" alt="QR">
+      <div class="t-info">
+        <div class="t-room">${o.roomOrBillNo}</div>
+        <div>${o.orderDate} · ${o.serviceType.name}</div>
+        <div class="t-docket">${o.docketNo}</div>
+      </div>
+    `;
+    grid.appendChild(tag);
+  }
+  printElement("print-tags", "size:A4; margin:12mm;");
+}
+
+// ---------- Pack / Scan ----------
+const scanInput = document.getElementById("scan-input");
+scanInput.addEventListener("keydown", async (e) => {
+  if (e.key !== "Enter") return;
+  const docketNo = scanInput.value.trim();
+  scanInput.value = "";
+  if (!docketNo) return;
+  await handleScan(docketNo);
+});
+
+async function handleScan(docketNo) {
+  const status = document.getElementById("scan-status");
+  status.textContent = "Looking up…";
+  status.className = "";
+  try {
+    const order = await getOrderByDocketNo(CUSTOMER_ID, docketNo);
+    if (!order) {
+      status.textContent = `No bill found for "${docketNo}".`;
+      status.className = "err";
+      return;
+    }
+    await printLabel(order);
+    await updateOrderStatus(order.id, "packed");
+    status.textContent = `Printed label for Room ${order.roomOrBillNo} (${order.docketNo}) — marked packed.`;
+    status.className = "ok";
+  } catch (err) {
+    status.textContent = "Scan failed — check connection and try again.";
+    status.className = "err";
+  } finally {
+    scanInput.focus();
+  }
+}
+
+async function printLabel(order) {
+  document.getElementById("lb-hotel").textContent = order.customerName;
+  document.getElementById("lb-room").textContent = order.roomOrBillNo;
+  document.getElementById("lb-meta").textContent = `${order.orderDate} · ${order.serviceType.name} · ${order.docketNo}`;
+  const items = document.getElementById("lb-items");
+  items.innerHTML = "";
+  order.lines.forEach((l) => {
+    const li = document.createElement("li");
+    li.textContent = `${l.item} × ${l.qty}`;
+    items.appendChild(li);
+  });
+  document.getElementById("lb-total-label").textContent = `${order.totalPieces} pcs`;
+  document.getElementById("lb-total-value").textContent = `Rs ${order.totalBillValue}`;
+  document.getElementById("lb-qr").src = await qrDataUrl(order.docketNo);
+
+  printElement("print-label", "size:100mm 130mm; margin:4mm;");
 }
 
 // ---------- Orders tab ----------
@@ -253,9 +380,14 @@ function renderOrders(orders) {
     const actions = tr.querySelector(".row-actions");
 
     const reprintBtn = document.createElement("button");
-    reprintBtn.textContent = "Print";
+    reprintBtn.textContent = "Docket";
     reprintBtn.addEventListener("click", () => printDocket(o));
     actions.appendChild(reprintBtn);
+
+    const labelBtn = document.createElement("button");
+    labelBtn.textContent = "Label";
+    labelBtn.addEventListener("click", () => printLabel(o));
+    actions.appendChild(labelBtn);
 
     if (o.status === "received") {
       const b = document.createElement("button");

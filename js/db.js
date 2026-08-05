@@ -46,8 +46,8 @@ export function makeDocketNo(code) {
   return `${code}-${stamp}`;
 }
 
-export async function createOrder(order) {
-  const row = {
+function orderToRow(order) {
+  return {
     customer_id: order.customerId,
     customer_name: order.customerName,
     docket_no: order.docketNo,
@@ -62,9 +62,29 @@ export async function createOrder(order) {
     total_bill_value: order.totalBillValue,
     status: "received",
   };
-  const { data, error } = await supabase.from("orders").insert(row).select().single();
+}
+
+export async function createOrder(order) {
+  const { data, error } = await supabase.from("orders").insert(orderToRow(order)).select().single();
   if (error) throw error;
   return data.id;
+}
+
+export async function createOrders(orders) {
+  const { data, error } = await supabase.from("orders").insert(orders.map(orderToRow)).select();
+  if (error) throw error;
+  return data.map(rowToOrder);
+}
+
+export async function getOrderByDocketNo(customerId, docketNo) {
+  const { data, error } = await supabase
+    .from("orders")
+    .select("*")
+    .eq("customer_id", customerId)
+    .eq("docket_no", docketNo)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? rowToOrder(data) : null;
 }
 
 export async function fetchOrders(customerId) {

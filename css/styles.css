@@ -161,13 +161,51 @@ td.num{font-family:"SFMono-Regular",Consolas,monospace;}
 
 .empty-state{padding:40px; text-align:center; color:var(--ink-faint); font-size:14px;}
 
-/* ---------- Print docket ---------- */
-#print-docket{display:none;}
-@media print{
-  body > *:not(#print-docket){display:none !important;}
-  #print-docket{display:block !important;}
-  @page{size:A4; margin:16mm;}
+/* ---------- Import & Scan ---------- */
+.muted{color:var(--ink-muted); font-size:13.5px;}
+#import-file{margin:14px 0;}
+#import-status{font-size:13.5px; color:var(--ink-muted); margin:10px 0;}
+#import-preview table{margin-bottom:14px;}
+#scan-input{
+  width:100%; padding:14px 12px; font-size:20px; text-align:center;
+  border:2px solid var(--accent); border-radius:8px; margin:14px 0; letter-spacing:.02em;
 }
+#scan-status{font-size:14px; margin-top:8px; min-height:1.2em;}
+#scan-status.ok{color:var(--green);}
+#scan-status.err{color:var(--red);}
+
+/* ---------- Print docket / tags / label ---------- */
+#print-docket, #print-tags, #print-label{display:none;}
+@media print{
+  body > *:not([data-print-root]){display:none !important;}
+  [data-print-root].show{display:block !important;}
+}
+/* Default page size (docket, tag sheet). Label printing overrides this via an injected style — see print.js. */
+@page{size:A4; margin:16mm;}
+
+/* ---------- QR tag sheet ---------- */
+.tag-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:4mm;}
+.tag{
+  border:1px dashed #8B9A9C; border-radius:2px; padding:3mm 4mm;
+  font-family:-apple-system,sans-serif; color:#1B2429; break-inside:avoid;
+  display:flex; align-items:center; gap:3mm;
+}
+.tag img{width:20mm; height:20mm; flex:none;}
+.tag .t-info{font-size:9px; line-height:1.4;}
+.tag .t-room{font-size:13px; font-weight:700;}
+.tag .t-docket{font-family:"SFMono-Regular",Consolas,monospace; font-size:8px; color:#5B6B70;}
+
+/* ---------- Sticker label ---------- */
+.label{
+  width:100mm; padding:4mm 5mm; font-family:-apple-system,sans-serif; color:#1B2429;
+}
+.label .l-hotel{font-weight:700; font-size:13px;}
+.label .l-room{font-family:"SFMono-Regular",Consolas,monospace; font-size:26px; font-weight:700; margin:2mm 0;}
+.label .l-meta{font-size:10px; color:#5B6B70; margin-bottom:2mm;}
+.label ul{margin:0; padding:0 0 0 14px; font-size:10.5px;}
+.label .l-total{margin-top:2mm; padding-top:2mm; border-top:1px solid #1B2429; font-weight:700; font-size:12px; display:flex; justify-content:space-between;}
+.label .l-qr{display:flex; justify-content:center; margin-top:2mm;}
+.label .l-qr img{width:22mm; height:22mm;}
 .docket{font-family:Georgia,serif; color:#1B2429; max-width:480px;}
 .docket .d-head{display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #1B2429; padding-bottom:10px; margin-bottom:12px;}
 .docket .d-brand{font-size:18px; font-weight:700;}
