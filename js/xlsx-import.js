@@ -45,13 +45,18 @@ export async function parseProductionSummary(file, customer) {
   catRow.forEach((v, c) => {
     if (v) bounds.push(c);
   });
-  const itemEndCol = bounds.length ? Math.max(...bounds) + 16 : 122; // fallback width guard, refined below
-  // Determine the true end column: first column at/after ITEM_START whose row8 header is empty for 3+ consecutive columns, or a known cap.
+
+  // Item columns run until the first computed/summary column (e.g. "Total Pieces",
+  // "Standerd Bill Value", ...) - stop there rather than at a blank-column gap, since
+  // those summary headers sit immediately adjacent to the last real item with no gap.
   const headerRow = rows[ROW_HEADERS] || [];
+  const SUMMARY_MARKERS = ["total pieces", "standerd bill value", "standard bill value"];
   let lastItemCol = ITEM_START;
   for (let c = ITEM_START; c < headerRow.length; c++) {
-    if (headerRow[c]) lastItemCol = c;
-    else if (c - lastItemCol > 3) break;
+    const h = String(headerRow[c] || "").trim().toLowerCase();
+    if (!h) continue;
+    if (SUMMARY_MARKERS.some((m) => h.startsWith(m))) break;
+    lastItemCol = c;
   }
 
   const categoryAt = (col) => {
