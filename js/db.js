@@ -121,3 +121,66 @@ export async function updateOrderStatus(orderId, status) {
   const { error } = await supabase.from("orders").update({ status }).eq("id", orderId);
   if (error) throw error;
 }
+
+export async function fetchPackedUnassignedOrders(customerId) {
+  const { data, error } = await supabase
+    .from("orders")
+    .select("*")
+    .eq("customer_id", customerId)
+    .eq("status", "packed")
+    .is("transfer_note_id", null)
+    .order("order_date", { ascending: true });
+  if (error) throw error;
+  return data.map(rowToOrder);
+}
+
+export async function createTransferNote({ customerId, transferNo, orders }) {
+  const { data: note, error } = await supabase
+    .from("transfer_notes")
+    .insert({
+      customer_id: customerId,
+      transfer_no: transferNo,
+      order_ids: orders.map((o) => o.id),
+      total_pieces: orders.reduce((s, o) => s + o.totalPieces, 0),
+    })
+    .select()
+    .single();
+  if (error) throw error;
+
+  const { error: updateError } = await supabase
+    .from("orders")
+    .update({ status: "dispatched", transfer_note_id: note.id })
+    .in("id", orders.map((o) => o.id));
+  if (updateError) throw updateError;
+
+  return rowToTransferNote(note);
+}
+
+export async function fetchTransferNotes(customerId) {
+  const { data, error } = await supabase
+    .from("transfer_notes")
+    .select("*")
+    .eq("customer_id", customerId)
+    .order("created_at", { ascending: false })
+    .limit(100);
+  if (error) throw error;
+  return data.map(rowToTransferNote);
+}
+
+export async function fetchOrdersByIds(orderIds) {
+  if (!orderIds.length) return [];
+  const { data, error } = await supabase.from("orders").select("*").in("id", orderIds);
+  if (error) throw error;
+  return data.map(rowToOrder);
+}
+
+function rowToTransferNote(row) {
+  return {
+    id: row.id,
+    customerId: row.customer_id,
+    transferNo: row.transfer_no,
+    transferDate: row.transfer_date,
+    orderIds: row.order_ids,
+    totalPieces: row.total_pieces,
+  };
+}

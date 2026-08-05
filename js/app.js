@@ -1,5 +1,8 @@
 import { watchAuth, login, logout } from "./auth.js";
-import { getCustomer, createOrder, createOrders, getOrderByDocketNo, makeDocketNo, fetchOrders, updateOrderStatus } from "./db.js";
+import {
+  getCustomer, createOrder, createOrders, getOrderByDocketNo, makeDocketNo, fetchOrders, updateOrderStatus,
+  fetchPackedUnassignedOrders, createTransferNote, fetchTransferNotes, fetchOrdersByIds,
+} from "./db.js";
 import { SERVICE_TYPES, statusLabel } from "./constants.js";
 import { parseProductionSummary } from "./xlsx-import.js";
 import { qrDataUrl } from "./qr.js";
@@ -48,7 +51,24 @@ document.querySelectorAll(".tab-btn").forEach((btn) => {
     document.querySelectorAll("main > section").forEach((s) => s.classList.add("hidden"));
     document.getElementById(`tab-${btn.dataset.tab}`).classList.remove("hidden");
     if (btn.dataset.tab === "orders") refreshOrders();
-    if (btn.dataset.tab === "pack") document.getElementById("scan-input").focus();
+    if (btn.dataset.tab === "transactions") {
+      const activeSub = document.querySelector('.subtab-btn[data-parent="transactions"].active')?.dataset.subtab;
+      if (activeSub === "packing") document.getElementById("scan-input").focus();
+      if (activeSub === "transfer") refreshTransferTab();
+    }
+  });
+});
+
+// ---------- Sub-tabs ----------
+document.querySelectorAll(".subtab-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const parent = btn.dataset.parent;
+    document.querySelectorAll(`.subtab-btn[data-parent="${parent}"]`).forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    document.querySelectorAll(`#tab-${parent} > [id^="subtab-"]`).forEach((s) => s.classList.add("hidden"));
+    document.getElementById(`subtab-${btn.dataset.subtab}`).classList.remove("hidden");
+    if (btn.dataset.subtab === "packing") document.getElementById("scan-input").focus();
+    if (btn.dataset.subtab === "transfer") refreshTransferTab();
   });
 });
 
@@ -358,49 +378,211 @@ async function printLabel(order) {
   printElement("print-label", "size:100mm 130mm; margin:4mm;");
 }
 
-// ---------- Orders tab ----------
+// ---------- Orders tab: grouped by hotel, then date, expandable ----------
+let ordersCache = [];
+
 function renderOrders(orders) {
-  const tbody = document.getElementById("orders-tbody");
+  ordersCache = orders;
+  const container = document.getElementById("orders-groups");
   const empty = document.getElementById("orders-empty");
-  tbody.innerHTML = "";
+  container.innerHTML = "";
   empty.classList.toggle("hidden", orders.length > 0);
 
-  orders.forEach((o) => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${o.docketNo || ""}</td>
-      <td>${o.orderDate || ""}</td>
-      <td>${o.roomOrBillNo || ""}</td>
-      <td>${o.serviceType?.name || ""}</td>
-      <td class="num">${o.totalPieces ?? ""}</td>
-      <td class="num">${o.totalBillValue ?? ""}</td>
-      <td><span class="chip ${o.status}">${statusLabel(o.status || "received")}</span></td>
-      <td class="row-actions"></td>
+  const byHotel = {};
+  orders.forEach((o) => (byHotel[o.customerName || "—"] ||= []).push(o));
+
+  Object.entries(byHotel).forEach(([hotelName, hotelOrders]) => {
+    const totalPieces = hotelOrders.reduce((s, o) => s + (o.totalPieces || 0), 0);
+    const group = document.createElement("div");
+    group.className = "hotel-group";
+    group.innerHTML = `
+      <div class="hotel-group-head">
+        <h3>${hotelName}</h3>
+        <span class="hg-meta">${hotelOrders.length} bill${hotelOrders.length === 1 ? "" : "s"} · ${totalPieces} pcs</span>
+      </div>
     `;
-    const actions = tr.querySelector(".row-actions");
 
-    const reprintBtn = document.createElement("button");
-    reprintBtn.textContent = "Docket";
-    reprintBtn.addEventListener("click", () => printDocket(o));
-    actions.appendChild(reprintBtn);
+    const byDate = {};
+    hotelOrders.forEach((o) => (byDate[o.orderDate || "—"] ||= []).push(o));
+    const dates = Object.keys(byDate).sort((a, b) => (a < b ? 1 : -1));
 
-    const labelBtn = document.createElement("button");
-    labelBtn.textContent = "Label";
-    labelBtn.addEventListener("click", () => printLabel(o));
-    actions.appendChild(labelBtn);
+    dates.forEach((date) => {
+      const dayOrders = byDate[date];
+      const dayPieces = dayOrders.reduce((s, o) => s + (o.totalPieces || 0), 0);
+      const statusCounts = {};
+      dayOrders.forEach((o) => (statusCounts[o.status || "received"] = (statusCounts[o.status || "received"] || 0) + 1));
 
-    if (o.status === "received") {
-      const b = document.createElement("button");
-      b.textContent = "Mark packed";
-      b.addEventListener("click", () => updateOrderStatus(o.id, "packed").then(refreshOrders));
-      actions.appendChild(b);
-    } else if (o.status === "packed") {
-      const b = document.createElement("button");
-      b.textContent = "Mark dispatched";
-      b.addEventListener("click", () => updateOrderStatus(o.id, "dispatched").then(refreshOrders));
-      actions.appendChild(b);
-    }
+      const dateGroup = document.createElement("div");
+      dateGroup.className = "date-group";
+      const chips = Object.entries(statusCounts)
+        .map(([st, n]) => `<span class="chip ${st}">${n} ${statusLabel(st)}</span>`)
+        .join("");
+      dateGroup.innerHTML = `
+        <div class="date-group-row">
+          <span class="dg-date">${date}</span>
+          <span class="dg-stats"><span>${dayOrders.length} bills</span><span>${dayPieces} pcs</span><span class="dg-chips">${chips}</span></span>
+          <span class="dg-toggle">Expand ▾</span>
+        </div>
+        <div class="date-group-body hidden">
+          <table>
+            <thead><tr><th>Docket</th><th>Room / bill no.</th><th>Service</th><th>Pieces</th><th>Total (Rs)</th><th>Status</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      `;
 
+      const row = dateGroup.querySelector(".date-group-row");
+      const body = dateGroup.querySelector(".date-group-body");
+      const toggle = dateGroup.querySelector(".dg-toggle");
+      row.addEventListener("click", () => {
+        const isHidden = body.classList.toggle("hidden");
+        toggle.textContent = isHidden ? "Expand ▾" : "Collapse ▴";
+      });
+
+      const tbody = dateGroup.querySelector("tbody");
+      dayOrders.forEach((o) => {
+        const tr = document.createElement("tr");
+        tr.className = "bill-row";
+        tr.innerHTML = `
+          <td>${o.docketNo || ""}</td>
+          <td>${o.roomOrBillNo || ""}</td>
+          <td>${o.serviceType?.name || ""}</td>
+          <td class="num">${o.totalPieces ?? ""}</td>
+          <td class="num">${o.totalBillValue ?? ""}</td>
+          <td><span class="chip ${o.status}">${statusLabel(o.status || "received")}</span></td>
+        `;
+        tr.addEventListener("click", () => openBillModal(o));
+        tbody.appendChild(tr);
+      });
+
+      group.appendChild(dateGroup);
+    });
+
+    container.appendChild(group);
+  });
+}
+
+// ---------- Bill detail modal ----------
+const billModal = document.getElementById("bill-modal");
+let modalOrder = null;
+
+function openBillModal(order) {
+  modalOrder = order;
+  document.getElementById("bm-title").textContent = `Room / bill ${order.roomOrBillNo}`;
+  document.getElementById("bm-meta").innerHTML =
+    `${order.customerName} · ${order.orderDate} · ${order.serviceType?.name} · <span class="chip ${order.status}">${statusLabel(order.status || "received")}</span> · docket ${order.docketNo}`;
+
+  const tbody = document.getElementById("bm-lines");
+  tbody.innerHTML = "";
+  order.lines.forEach((l) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${l.item}</td><td>${l.category}</td><td style="text-align:right">${l.qty}</td><td style="text-align:right">${l.rate}</td><td style="text-align:right">${l.lineTotal}</td>`;
     tbody.appendChild(tr);
   });
+
+  document.getElementById("bm-totals").innerHTML = `
+    <span>${order.totalPieces} pcs</span>
+    <span>Surcharge Rs ${order.surchargeValue}</span>
+    <span>Pickup Rs ${order.pickupFee}</span>
+    <b>Total Rs ${order.totalBillValue}</b>
+  `;
+  billModal.classList.remove("hidden");
+}
+
+document.getElementById("bm-close").addEventListener("click", () => billModal.classList.add("hidden"));
+billModal.addEventListener("click", (e) => { if (e.target === billModal) billModal.classList.add("hidden"); });
+document.getElementById("bm-print-docket").addEventListener("click", () => modalOrder && printDocket(modalOrder));
+document.getElementById("bm-print-label").addEventListener("click", () => modalOrder && printLabel(modalOrder));
+
+// ---------- Transactions: Transfer Note ----------
+let transferCandidates = [];
+const selectedForTransfer = new Set();
+
+async function refreshTransferTab() {
+  transferCandidates = await fetchPackedUnassignedOrders(CUSTOMER_ID);
+  selectedForTransfer.clear();
+  renderTransferCandidates();
+  await renderTransferHistory();
+}
+
+function renderTransferCandidates() {
+  const tbody = document.getElementById("tn-candidates-body");
+  const empty = document.getElementById("tn-candidates-empty");
+  tbody.innerHTML = "";
+  empty.classList.toggle("hidden", transferCandidates.length > 0);
+
+  transferCandidates.forEach((o) => {
+    const tr = document.createElement("tr");
+    const td = document.createElement("td");
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.addEventListener("change", () => {
+      if (cb.checked) selectedForTransfer.add(o.id);
+      else selectedForTransfer.delete(o.id);
+    });
+    td.appendChild(cb);
+    tr.appendChild(td);
+    tr.insertAdjacentHTML("beforeend", `<td>${o.docketNo}</td><td>${o.orderDate}</td><td>${o.roomOrBillNo}</td><td class="num">${o.totalPieces}</td>`);
+    tbody.appendChild(tr);
+  });
+}
+
+document.getElementById("btn-create-transfer").addEventListener("click", async () => {
+  const msg = document.getElementById("transfer-msg");
+  const btn = document.getElementById("btn-create-transfer");
+  const chosen = transferCandidates.filter((o) => selectedForTransfer.has(o.id));
+  if (chosen.length === 0) { msg.textContent = "Tick at least one bill."; msg.className = "err"; return; }
+
+  btn.disabled = true;
+  msg.textContent = "Creating transfer note…";
+  msg.className = "";
+  try {
+    const transferNo = `TN-${customer.code}-${makeDocketNo("").replace(/^-/, "")}`;
+    const note = await createTransferNote({ customerId: CUSTOMER_ID, transferNo, orders: chosen });
+    await printTransferNote(note, chosen);
+    msg.textContent = `Transfer note ${note.transferNo} created — ${chosen.length} bills marked dispatched.`;
+    msg.className = "ok";
+    await refreshTransferTab();
+  } catch (err) {
+    msg.textContent = "Could not create transfer note — check connection and try again.";
+    msg.className = "err";
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+async function renderTransferHistory() {
+  const notes = await fetchTransferNotes(CUSTOMER_ID);
+  const tbody = document.getElementById("tn-history-body");
+  const empty = document.getElementById("tn-history-empty");
+  tbody.innerHTML = "";
+  empty.classList.toggle("hidden", notes.length > 0);
+
+  notes.forEach((n) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${n.transferNo}</td><td>${n.transferDate}</td><td class="num">${n.orderIds.length}</td><td class="num">${n.totalPieces}</td><td class="row-actions"></td>`;
+    const btn = document.createElement("button");
+    btn.textContent = "Reprint";
+    btn.addEventListener("click", async () => {
+      const orders = await fetchOrdersByIds(n.orderIds);
+      printTransferNote(n, orders);
+    });
+    tr.querySelector(".row-actions").appendChild(btn);
+    tbody.appendChild(tr);
+  });
+}
+
+async function printTransferNote(note, orders) {
+  document.getElementById("tn-ref").innerHTML = `${note.transferNo}`;
+  document.getElementById("tn-print-customer").innerHTML = `<b>${customer.name}</b>`;
+  document.getElementById("tn-print-date").textContent = note.transferDate;
+  const tbody = document.getElementById("tn-print-lines");
+  tbody.innerHTML = "";
+  orders.forEach((o) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${o.docketNo}</td><td>${o.roomOrBillNo}</td><td style="text-align:right">${o.totalPieces}</td>`;
+    tbody.appendChild(tr);
+  });
+  document.getElementById("tn-print-total-label").textContent = `Total — ${orders.length} bills, ${note.totalPieces} pcs`;
+  printElement("print-transfer", "size:A4; margin:16mm;");
 }

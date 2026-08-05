@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LaundroPlus — Bill &amp; Pack</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A7%BA%3C/text%3E%3C/svg%3E">
 <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
@@ -33,106 +34,163 @@
   </header>
 
   <nav class="tabs">
-    <button class="tab-btn active" data-tab="import">Import Excel</button>
-    <button class="tab-btn" data-tab="pack">Pack (Scan)</button>
-    <button class="tab-btn" data-tab="orders">Orders</button>
-    <button class="tab-btn" data-tab="neworder">New Order</button>
+    <button class="tab-btn active" data-tab="entry">1. Upload / Enter Data</button>
+    <button class="tab-btn" data-tab="orders">2-3. Orders</button>
+    <button class="tab-btn" data-tab="transactions">4. Transactions</button>
   </nav>
 
   <main>
-    <!-- IMPORT -->
-    <section id="tab-import">
-      <div class="panel">
-        <h2>Upload the Production Summary workbook</h2>
-        <p class="muted">Same file you already keep — nothing changes about how you fill it in. Each bill row becomes an order and gets a QR tag to print and attach to the bag.</p>
-        <input type="file" id="import-file" accept=".xlsx,.xlsm,.xls">
-        <div id="import-status"></div>
-        <div id="import-preview" class="hidden">
-          <table>
-            <thead><tr><th>Docket</th><th>Date</th><th>Room / bill no.</th><th>Service</th><th>Pieces</th><th>Total (Rs)</th></tr></thead>
-            <tbody id="import-preview-body"></tbody>
-          </table>
-          <button class="btn-primary" id="btn-confirm-import">Import &amp; print QR tags</button>
+    <!-- 1. UPLOAD / ENTER DATA -->
+    <section id="tab-entry">
+      <nav class="subtabs">
+        <button class="subtab-btn active" data-parent="entry" data-subtab="upload">Upload Excel</button>
+        <button class="subtab-btn" data-parent="entry" data-subtab="manual">Enter Manually</button>
+      </nav>
+
+      <div id="subtab-upload">
+        <div class="panel">
+          <h2>Upload the Production Summary workbook</h2>
+          <p class="muted">Same file you already keep — nothing changes about how you fill it in. Each bill row becomes an order and gets a QR tag to print and attach to the bag.</p>
+          <input type="file" id="import-file" accept=".xlsx,.xlsm,.xls">
+          <div id="import-status"></div>
+          <div id="import-preview" class="hidden">
+            <table>
+              <thead><tr><th>Docket</th><th>Date</th><th>Room / bill no.</th><th>Service</th><th>Pieces</th><th>Total (Rs)</th></tr></thead>
+              <tbody id="import-preview-body"></tbody>
+            </table>
+            <button class="btn-primary" id="btn-confirm-import">Import &amp; print QR tags</button>
+          </div>
         </div>
       </div>
-    </section>
 
-    <!-- PACK / SCAN -->
-    <section id="tab-pack" class="hidden">
-      <div class="panel" style="max-width:420px;">
-        <h2>Scan a bag's QR tag</h2>
-        <p class="muted">Point the scanner at the tag — the label prints automatically and the order is marked packed.</p>
-        <input type="text" id="scan-input" placeholder="Waiting for scan…" autocomplete="off">
-        <div id="scan-status"></div>
-      </div>
-    </section>
+      <div id="subtab-manual" class="hidden">
+        <div class="order-layout">
+          <div>
+            <div class="panel">
+              <h2>Order details</h2>
+              <div class="field-row">
+                <div class="field">
+                  <label for="f-customer">Customer</label>
+                  <select id="f-customer"><option value="sheraton">Sheraton</option></select>
+                </div>
+                <div class="field">
+                  <label for="f-room">Room / bill number</label>
+                  <input type="text" id="f-room" placeholder="e.g. 1602 or guest name">
+                </div>
+                <div class="field">
+                  <label for="f-service">Service type</label>
+                  <select id="f-service"></select>
+                </div>
+                <div class="field">
+                  <label for="f-pickup">Pickup / delivery fee (optional)</label>
+                  <input type="number" id="f-pickup" min="0" step="1" placeholder="0">
+                </div>
+              </div>
+            </div>
 
-    <!-- NEW ORDER -->
-    <section id="tab-neworder" class="hidden">
-      <div class="order-layout">
-        <div>
-          <div class="panel">
-            <h2>Order details</h2>
-            <div class="field-row">
-              <div class="field">
-                <label for="f-customer">Customer</label>
-                <select id="f-customer"><option value="sheraton">Sheraton</option></select>
-              </div>
-              <div class="field">
-                <label for="f-room">Room / bill number</label>
-                <input type="text" id="f-room" placeholder="e.g. 1602 or guest name">
-              </div>
-              <div class="field">
-                <label for="f-service">Service type</label>
-                <select id="f-service"></select>
-              </div>
-              <div class="field">
-                <label for="f-pickup">Pickup / delivery fee (optional)</label>
-                <input type="number" id="f-pickup" min="0" step="1" placeholder="0">
-              </div>
+            <div class="panel">
+              <h2>Items</h2>
+              <div id="item-picker"></div>
             </div>
           </div>
 
-          <div class="panel">
-            <h2>Items</h2>
-            <div id="item-picker"></div>
-          </div>
-        </div>
-
-        <div>
-          <div class="panel" style="position:sticky; top:20px;">
-            <h2>Summary</h2>
-            <div class="summary-line"><span class="k">Total pieces</span><span id="s-pieces">0</span></div>
-            <div class="summary-line"><span class="k">Standard value</span><span id="s-standard">Rs 0</span></div>
-            <div class="summary-line"><span class="k">Service surcharge</span><span id="s-surcharge">Rs 0</span></div>
-            <div class="summary-line"><span class="k">Pickup / delivery</span><span id="s-pickup">Rs 0</span></div>
-            <div class="summary-line total"><span class="k">Total bill value</span><span id="s-total">Rs 0</span></div>
-            <button class="btn-primary" id="btn-save-print">Save &amp; print docket</button>
-            <div id="save-msg"></div>
+          <div>
+            <div class="panel" style="position:sticky; top:20px;">
+              <h2>Summary</h2>
+              <div class="summary-line"><span class="k">Total pieces</span><span id="s-pieces">0</span></div>
+              <div class="summary-line"><span class="k">Standard value</span><span id="s-standard">Rs 0</span></div>
+              <div class="summary-line"><span class="k">Service surcharge</span><span id="s-surcharge">Rs 0</span></div>
+              <div class="summary-line"><span class="k">Pickup / delivery</span><span id="s-pickup">Rs 0</span></div>
+              <div class="summary-line total"><span class="k">Total bill value</span><span id="s-total">Rs 0</span></div>
+              <button class="btn-primary" id="btn-save-print">Save &amp; print docket</button>
+              <div id="save-msg"></div>
+            </div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- ORDERS -->
+    <!-- 2-3. ORDERS: grouped by hotel + date, expandable, click a bill for full detail -->
     <section id="tab-orders" class="hidden">
       <div style="display:flex; justify-content:flex-end; margin-bottom:10px;">
-        <button id="btn-refresh-orders" style="font-size:12px; padding:6px 12px; border-radius:6px; border:1px solid var(--line); background:var(--panel); color:var(--ink-muted);">Refresh</button>
+        <button id="btn-refresh-orders" class="btn-ghost">Refresh</button>
       </div>
-      <div class="tbl-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Docket</th><th>Date</th><th>Room / bill no.</th><th>Service</th>
-              <th>Pieces</th><th>Total (Rs)</th><th>Status</th><th></th>
-            </tr>
-          </thead>
-          <tbody id="orders-tbody"></tbody>
-        </table>
-        <div id="orders-empty" class="empty-state hidden">No orders yet — save one from the New Order tab.</div>
+      <div id="orders-groups"></div>
+      <div id="orders-empty" class="empty-state hidden">No orders yet — upload a workbook or enter one manually.</div>
+    </section>
+
+    <!-- 4. TRANSACTIONS: Packing (scan) + Transfer Note -->
+    <section id="tab-transactions" class="hidden">
+      <nav class="subtabs">
+        <button class="subtab-btn active" data-parent="transactions" data-subtab="packing">Packing (Scan)</button>
+        <button class="subtab-btn" data-parent="transactions" data-subtab="transfer">Transfer Note</button>
+      </nav>
+
+      <div id="subtab-packing">
+        <div class="panel" style="max-width:420px;">
+          <h2>Scan a bag's QR tag</h2>
+          <p class="muted">Point the scanner at the tag — the label prints automatically and the order is marked packed.</p>
+          <input type="text" id="scan-input" placeholder="Waiting for scan…" autocomplete="off">
+          <div id="scan-status"></div>
+        </div>
+      </div>
+
+      <div id="subtab-transfer" class="hidden">
+        <div class="panel">
+          <h2>Create a transfer note</h2>
+          <p class="muted">Pick the packed bills going out on this delivery run, then close &amp; print — it's what the driver carries and the hotel signs against.</p>
+          <div class="field-row">
+            <div class="field">
+              <label for="tn-customer">Location / hotel</label>
+              <select id="tn-customer"><option value="sheraton">Sheraton</option></select>
+            </div>
+          </div>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th></th><th>Docket</th><th>Date</th><th>Room / bill no.</th><th>Pieces</th></tr></thead>
+              <tbody id="tn-candidates-body"></tbody>
+            </table>
+            <div id="tn-candidates-empty" class="empty-state hidden">No packed bills waiting to be transferred for this location.</div>
+          </div>
+          <button class="btn-primary" id="btn-create-transfer" style="max-width:280px;">Close &amp; print transfer note</button>
+          <div id="transfer-msg"></div>
+        </div>
+
+        <div class="panel">
+          <h2>Past transfer notes</h2>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>Transfer No.</th><th>Date</th><th>Bills</th><th>Pieces</th><th></th></tr></thead>
+              <tbody id="tn-history-body"></tbody>
+            </table>
+            <div id="tn-history-empty" class="empty-state hidden">No transfer notes yet.</div>
+          </div>
+        </div>
       </div>
     </section>
   </main>
+</div>
+
+<!-- BILL DETAIL MODAL -->
+<div id="bill-modal" class="modal hidden">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h2 id="bm-title"></h2>
+      <button id="bm-close" class="btn-ghost">Close</button>
+    </div>
+    <div class="modal-meta" id="bm-meta"></div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Item</th><th>Category</th><th style="text-align:right">Qty</th><th style="text-align:right">Rate</th><th style="text-align:right">Amount</th></tr></thead>
+        <tbody id="bm-lines"></tbody>
+      </table>
+    </div>
+    <div class="modal-totals" id="bm-totals"></div>
+    <div class="modal-actions">
+      <button id="bm-print-docket" class="btn-ghost">Reprint docket</button>
+      <button id="bm-print-label" class="btn-ghost">Reprint label</button>
+    </div>
+  </div>
 </div>
 
 <!-- PRINT: DOCKET (populated by JS, only visible when printing) -->
@@ -169,6 +227,26 @@
     <ul id="lb-items"></ul>
     <div class="l-total"><span id="lb-total-label"></span><span id="lb-total-value"></span></div>
     <div class="l-qr"><img id="lb-qr" alt="QR"></div>
+  </div>
+</div>
+
+<!-- PRINT: TRANSFER NOTE -->
+<div id="print-transfer" data-print-root>
+  <div class="docket" style="max-width:100%;">
+    <div class="d-head">
+      <div class="d-brand">LaundroPlus<small>Transfer Note</small></div>
+      <div class="d-ref" id="tn-ref"></div>
+    </div>
+    <div class="d-meta">
+      <span id="tn-print-customer"></span>
+      <span id="tn-print-date"></span>
+    </div>
+    <table>
+      <thead><tr><th>Docket</th><th>Room / bill no.</th><th style="text-align:right">Pieces</th></tr></thead>
+      <tbody id="tn-print-lines"></tbody>
+    </table>
+    <div class="d-total"><span id="tn-print-total-label">Total</span><span></span></div>
+    <div class="d-foot"><span>Handed over by: ______________</span><span>Received by: ______________</span></div>
   </div>
 </div>
 

@@ -85,6 +85,19 @@ header.topbar{
 }
 .tab-btn.active{color:var(--accent-strong); border-bottom-color:var(--accent);}
 
+.subtabs{display:flex; gap:8px; margin-bottom:16px;}
+.subtab-btn{
+  background:var(--panel); border:1px solid var(--line); color:var(--ink-muted);
+  padding:7px 14px; border-radius:100px; font-size:13px;
+}
+.subtab-btn.active{background:var(--accent-wash); color:var(--accent-strong); border-color:var(--accent-wash);}
+
+.btn-ghost{
+  font-size:12.5px; padding:6px 12px; border-radius:6px; border:1px solid var(--line);
+  background:var(--panel); color:var(--ink-muted);
+}
+.btn-ghost:hover{border-color:var(--accent); color:var(--accent-strong);}
+
 main{max-width:1080px; margin:0 auto; padding:28px 24px 80px;}
 
 /* ---------- New order ---------- */
@@ -160,6 +173,44 @@ td.num{font-family:"SFMono-Regular",Consolas,monospace;}
 .row-actions button:hover{border-color:var(--accent); color:var(--accent-strong);}
 
 .empty-state{padding:40px; text-align:center; color:var(--ink-faint); font-size:14px;}
+
+/* ---------- Orders: grouped by hotel + date ---------- */
+.hotel-group{margin-bottom:22px;}
+.hotel-group-head{
+  display:flex; align-items:baseline; gap:12px; padding:10px 2px; border-bottom:2px solid var(--ink);
+  margin-bottom:10px;
+}
+.hotel-group-head h3{font-size:16px;}
+.hotel-group-head .hg-meta{font-size:12.5px; color:var(--ink-muted);}
+
+.date-group{
+  background:var(--panel); border:1px solid var(--line); border-radius:10px; margin-bottom:8px; box-shadow:var(--shadow);
+  overflow:hidden;
+}
+.date-group-row{
+  display:flex; align-items:center; justify-content:space-between; gap:12px; padding:11px 16px; cursor:pointer;
+}
+.date-group-row:hover{background:var(--panel-2);}
+.date-group-row .dg-date{font-weight:600; font-size:14px; width:120px;}
+.date-group-row .dg-stats{display:flex; gap:16px; flex:1; font-size:13px; color:var(--ink-muted); flex-wrap:wrap;}
+.date-group-row .dg-chips{display:flex; gap:6px;}
+.date-group-row .dg-toggle{font-size:12px; color:var(--accent-strong); font-weight:600; white-space:nowrap;}
+.date-group-body{border-top:1px solid var(--line);}
+.date-group-body table{min-width:0;}
+.bill-row{cursor:pointer;}
+.bill-row:hover{background:var(--accent-wash);}
+
+/* ---------- Modal ---------- */
+.modal{position:fixed; inset:0; background:rgba(27,36,41,0.45); display:flex; align-items:center; justify-content:center; padding:20px; z-index:50;}
+.modal-card{
+  background:var(--panel); border-radius:12px; box-shadow:var(--shadow); padding:24px 28px;
+  width:100%; max-width:640px; max-height:85vh; overflow-y:auto;
+}
+.modal-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;}
+.modal-meta{font-size:13.5px; color:var(--ink-muted); margin-bottom:16px;}
+.modal-totals{display:flex; justify-content:flex-end; gap:24px; padding:12px 0; font-size:14px;}
+.modal-totals b{font-size:16px;}
+.modal-actions{display:flex; gap:10px; justify-content:flex-end; margin-top:10px;}
 
 /* ---------- Import & Scan ---------- */
 .muted{color:var(--ink-muted); font-size:13.5px;}
