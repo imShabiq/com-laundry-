@@ -1,7 +1,7 @@
 import { watchAuth, login, logout } from "./auth.js";
 import {
   getCustomer, createOrder, createOrders, getOrderByDocketNo, getOrderByUniqueCode, makeDocketNo,
-  generateUniqueCode, generateUniqueCodes, fetchOrders, updateOrderStatus,
+  generateUniqueCode, generateUniqueCodes, fetchOrders, updateOrderStatus, savePacking,
   fetchPackedUnassignedOrders, createTransferNote, fetchTransferNotes, fetchOrdersByIds,
 } from "./db.js";
 import { SERVICE_TYPES, statusLabel } from "./constants.js";
@@ -11,6 +11,7 @@ import { printElement } from "./print.js";
 
 const CUSTOMER_ID = "sheraton";
 let customer = null;
+let currentUserEmail = "";
 
 // ---------- Auth ----------
 const viewLogin = document.getElementById("view-login");
@@ -37,6 +38,7 @@ watchAuth(async (user) => {
     viewLogin.classList.add("hidden");
     viewApp.classList.remove("hidden");
     document.getElementById("user-email").textContent = user.email;
+    currentUserEmail = user.email;
     await initCustomerAndUI();
   } else {
     viewApp.classList.add("hidden");
@@ -427,6 +429,8 @@ async function printTagSheet(orders) {
 
 // ---------- Pack / Scan ----------
 const scanInput = document.getElementById("scan-input");
+let scannedOrder = null;
+
 scanInput.addEventListener("keydown", async (e) => {
   if (e.key !== "Enter") return;
   const code = scanInput.value.trim();
@@ -437,8 +441,11 @@ scanInput.addEventListener("keydown", async (e) => {
 
 async function handleScan(code) {
   const status = document.getElementById("scan-status");
+  const detail = document.getElementById("pack-bill-detail");
   status.textContent = "Looking up…";
   status.className = "";
+  detail.classList.add("hidden");
+  scannedOrder = null;
   try {
     // Older-style codes (from before the unique-code system) are still matched by docket number.
     const order = (await getOrderByUniqueCode(code)) || (await getOrderByDocketNo(CUSTOMER_ID, code));
@@ -447,16 +454,88 @@ async function handleScan(code) {
       status.className = "err";
       return;
     }
-    await printLabel(order);
-    await updateOrderStatus(order.id, "packed");
-    status.textContent = `Printed label for Room ${order.roomOrBillNo} (${order.uniqueCode || order.docketNo}) — marked packed.`;
-    status.className = "ok";
+    scannedOrder = order;
+    status.textContent = order.status === "packed"
+      ? `Already packed (${order.packetCount ?? "?"} packets) — re-saving will reprint stickers.`
+      : `Loaded Room ${order.roomOrBillNo}.`;
+    status.className = order.status === "packed" ? "" : "ok";
+
+    document.getElementById("pk-customer").textContent = order.guestName || order.customerName || "—";
+    document.getElementById("pk-room").textContent = order.roomNumber || order.roomOrBillNo || "—";
+    document.getElementById("pk-bill-number").textContent = order.billNumber || order.roomOrBillNo || "—";
+    document.getElementById("pk-receipt-code").textContent = order.uniqueCode || order.docketNo || "—";
+    document.getElementById("pk-packing-method").textContent = order.packingMethod || "Folded";
+    document.getElementById("pk-total-qty").textContent = order.totalPieces;
+    const itemsBody = document.getElementById("pk-items");
+    itemsBody.innerHTML = "";
+    order.lines.forEach((l) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${l.item}</td><td style="text-align:right">${l.qty}</td>`;
+      itemsBody.appendChild(tr);
+    });
+    document.getElementById("pk-packet-count").value = order.packetCount || 1;
+    document.getElementById("pack-save-msg").textContent = "";
+    detail.classList.remove("hidden");
+    document.getElementById("pk-packet-count").focus();
   } catch (err) {
     status.textContent = "Scan failed — check connection and try again.";
     status.className = "err";
-  } finally {
-    scanInput.focus();
   }
+}
+
+document.getElementById("btn-save-packing").addEventListener("click", async () => {
+  const msg = document.getElementById("pack-save-msg");
+  const btn = document.getElementById("btn-save-packing");
+  const packetCount = Number(document.getElementById("pk-packet-count").value);
+  if (!scannedOrder) return;
+  if (!packetCount || packetCount < 1) { msg.textContent = "Enter a packet count of at least 1."; msg.className = "err"; return; }
+
+  btn.disabled = true;
+  msg.textContent = "Saving…";
+  msg.className = "";
+  try {
+    await savePacking(scannedOrder.id, packetCount, currentUserEmail);
+    await printStickers(scannedOrder, packetCount);
+    msg.textContent = `Saved — ${packetCount} sticker${packetCount === 1 ? "" : "s"} printed. Marked packed.`;
+    msg.className = "ok";
+    document.getElementById("pack-bill-detail").classList.add("hidden");
+    document.getElementById("scan-status").textContent = "";
+    scannedOrder = null;
+    scanInput.value = "";
+    scanInput.focus();
+  } catch (err) {
+    msg.textContent = "Could not save packing — check connection and try again.";
+    msg.className = "err";
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+async function printStickers(order, packetCount) {
+  const list = document.getElementById("sticker-list");
+  list.innerHTML = "";
+  const code = order.uniqueCode || order.docketNo;
+  const qr = await qrDataUrl(code);
+  for (let i = 1; i <= packetCount; i++) {
+    const sticker = document.createElement("div");
+    sticker.className = "sticker";
+    sticker.innerHTML = `
+      <div class="sk-top">
+        <div class="sk-customer">${order.guestName || order.customerName || "—"}</div>
+        <div class="sk-packet">Packet ${i} of ${packetCount}</div>
+      </div>
+      <div class="sk-body">
+        <img src="${qr}" alt="QR">
+        <div class="sk-info">
+          <div><span>Room</span> <b>${order.roomNumber || order.roomOrBillNo || "—"}</b></div>
+          <div><span>Bill No</span> <b>${order.billNumber || order.roomOrBillNo || "—"}</b></div>
+          <div><span>Receipt</span> <b>${code}</b></div>
+        </div>
+      </div>
+    `;
+    list.appendChild(sticker);
+  }
+  printElement("print-stickers", "size:101.6mm 50.8mm; margin:0;");
 }
 
 async function printLabel(order) {

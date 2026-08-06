@@ -264,8 +264,16 @@ tbody tr:hover{background:var(--accent-wash);}
 #scan-status.ok{color:var(--green);}
 #scan-status.err{color:var(--red);}
 
+#pack-bill-detail{margin-top:20px; padding-top:20px; border-top:1px solid var(--line);}
+.pack-detail-row{display:flex; justify-content:space-between; font-size:13.5px; padding:5px 0;}
+.pack-detail-row span{color:var(--ink-muted);}
+#pack-bill-detail table{margin:14px 0;}
+#pack-save-msg{font-size:13px; margin-top:10px; text-align:center; min-height:1em;}
+#pack-save-msg.ok{color:var(--green);}
+#pack-save-msg.err{color:var(--red);}
+
 /* ---------- Print docket / tags / label ---------- */
-#print-receipt, #print-tags, #print-label, #print-transfer{display:none;}
+#print-receipt, #print-tags, #print-label, #print-stickers, #print-transfer{display:none;}
 @media print{
   body > *:not([data-print-root]){display:none !important;}
   [data-print-root].show{display:block !important;}
@@ -296,6 +304,23 @@ tbody tr:hover{background:var(--accent-wash);}
 .label .l-total{margin-top:2mm; padding-top:2mm; border-top:1px solid #1B2429; font-weight:700; font-size:12px; display:flex; justify-content:space-between;}
 .label .l-qr{display:flex; justify-content:center; margin-top:2mm;}
 .label .l-qr img{width:22mm; height:22mm;}
+
+/* ---------- Packet stickers, 4x2in each, one per printed page ---------- */
+.sticker{
+  width:101.6mm; height:50.8mm; box-sizing:border-box; padding:3mm 4mm;
+  font-family:-apple-system,sans-serif; color:#1B2429;
+  display:flex; flex-direction:column; justify-content:space-between;
+  page-break-after:always; break-after:page;
+}
+.sticker:last-child{page-break-after:auto; break-after:auto;}
+.sticker .sk-top{display:flex; justify-content:space-between; align-items:baseline; border-bottom:1px solid #1B2429; padding-bottom:1.5mm;}
+.sticker .sk-customer{font-weight:700; font-size:14px;}
+.sticker .sk-packet{font-size:12px; font-weight:700;}
+.sticker .sk-body{display:flex; align-items:center; gap:4mm; flex:1; margin-top:2mm;}
+.sticker .sk-body img{width:24mm; height:24mm; flex:none;}
+.sticker .sk-info{font-size:11px; line-height:1.7;}
+.sticker .sk-info span{color:#5B6B70; display:inline-block; width:19mm;}
+.sticker .sk-info b{font-family:"SFMono-Regular",Consolas,monospace;}
 .docket{font-family:Georgia,serif; color:#1B2429; max-width:480px;}
 .docket .d-head{display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #1B2429; padding-bottom:10px; margin-bottom:12px;}
 .docket .d-brand{font-size:18px; font-weight:700;}

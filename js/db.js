@@ -158,6 +158,14 @@ export async function updateOrderStatus(orderId, status) {
   if (error) throw error;
 }
 
+export async function savePacking(orderId, packetCount, packedBy) {
+  const { error } = await supabase
+    .from("orders")
+    .update({ status: "packed", packet_count: packetCount, packed_by: packedBy, packed_at: new Date().toISOString() })
+    .eq("id", orderId);
+  if (error) throw error;
+}
+
 export async function fetchPackedUnassignedOrders(customerId) {
   const { data, error } = await supabase
     .from("orders")

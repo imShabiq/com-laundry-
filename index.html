@@ -172,11 +172,30 @@
       </nav>
 
       <div id="subtab-packing">
-        <div class="panel" style="max-width:420px;">
-          <h2>Scan a bag's QR tag</h2>
-          <p class="muted">Point the scanner at the tag — the label prints automatically and the order is marked packed.</p>
+        <div class="panel" style="max-width:520px;">
+          <h2>Scan the receipt QR code</h2>
+          <p class="muted">Scan the QR from the customer's receipt, or type the unique code and press Enter.</p>
           <input type="text" id="scan-input" placeholder="Waiting for scan…" autocomplete="off">
           <div id="scan-status"></div>
+
+          <div id="pack-bill-detail" class="hidden">
+            <div class="pack-detail-row"><span>Customer</span><b id="pk-customer"></b></div>
+            <div class="pack-detail-row"><span>Room number</span><b id="pk-room"></b></div>
+            <div class="pack-detail-row"><span>Bill number</span><b id="pk-bill-number"></b></div>
+            <div class="pack-detail-row"><span>Receipt code</span><b id="pk-receipt-code"></b></div>
+            <div class="pack-detail-row"><span>Packing type</span><b id="pk-packing-method"></b></div>
+            <div class="pack-detail-row"><span>Total qty</span><b id="pk-total-qty"></b></div>
+            <table>
+              <thead><tr><th>Item</th><th style="text-align:right">Qty</th></tr></thead>
+              <tbody id="pk-items"></tbody>
+            </table>
+            <div class="field">
+              <label for="pk-packet-count">Packet count</label>
+              <input type="number" id="pk-packet-count" min="1" step="1" value="1">
+            </div>
+            <button class="btn-primary" id="btn-save-packing">Save packing &amp; print stickers</button>
+            <div id="pack-save-msg"></div>
+          </div>
         </div>
       </div>
 
@@ -276,6 +295,11 @@
     <div class="l-total"><span id="lb-total-label"></span><span id="lb-total-value"></span></div>
     <div class="l-qr"><img id="lb-qr" alt="QR"></div>
   </div>
+</div>
+
+<!-- PRINT: PACKET STICKERS, 4x2in each, one per packet -->
+<div id="print-stickers" data-print-root>
+  <div id="sticker-list"></div>
 </div>
 
 <!-- PRINT: TRANSFER NOTE -->
