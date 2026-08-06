@@ -3,7 +3,8 @@ import {
   getCustomer, createOrder, createOrders, getOrderByDocketNo, getOrderByUniqueCode, makeDocketNo,
   generateUniqueCode, generateUniqueCodes, fetchOrders, updateOrderStatus, savePacking,
   fetchPackedUnassignedOrders, createTransferNote, fetchTransferNotes, fetchOrdersByIds,
-  fetchWorkflowStages, fetchStatusHistory, changeOrderStatus,
+  fetchWorkflowStages, fetchStatusHistory, changeOrderStatus, logStatusHistory, searchOrders,
+  fetchAllOrdersForDashboard,
 } from "./db.js";
 import { SERVICE_TYPES, statusLabel } from "./constants.js";
 import { parseProductionSummary } from "./xlsx-import.js";
@@ -48,12 +49,71 @@ watchAuth(async (user) => {
   }
 });
 
+// ---------- Global search (also the "scan anywhere" QR lookup) ----------
+const globalSearch = document.getElementById("global-search");
+const searchResults = document.getElementById("search-results");
+let searchDebounce = null;
+
+globalSearch.addEventListener("input", () => {
+  clearTimeout(searchDebounce);
+  const q = globalSearch.value.trim();
+  if (!q) { searchResults.classList.add("hidden"); return; }
+  searchDebounce = setTimeout(() => runGlobalSearch(q), 250);
+});
+
+globalSearch.addEventListener("keydown", (e) => {
+  if (e.key !== "Enter") return;
+  clearTimeout(searchDebounce);
+  const q = globalSearch.value.trim();
+  if (q) runGlobalSearch(q, true);
+});
+
+document.addEventListener("click", (e) => {
+  if (!e.target.closest(".topbar-search")) searchResults.classList.add("hidden");
+});
+
+async function runGlobalSearch(q, openIfSingle) {
+  try {
+    const results = await searchOrders(CUSTOMER_ID, q);
+    if (openIfSingle && results.length === 1) {
+      openBillModal(results[0]);
+      searchResults.classList.add("hidden");
+      globalSearch.value = "";
+      return;
+    }
+    renderSearchResults(results);
+  } catch (err) {
+    renderSearchResults([]);
+  }
+}
+
+function renderSearchResults(results) {
+  searchResults.innerHTML = "";
+  if (results.length === 0) {
+    searchResults.innerHTML = `<div class="sr-empty">No bills found.</div>`;
+  } else {
+    results.forEach((o) => {
+      const item = document.createElement("div");
+      item.className = "sr-item";
+      item.innerHTML = `<b>${o.uniqueCode || o.docketNo}</b> — ${o.guestName || o.customerName || "—"} · Room ${o.roomNumber || o.roomOrBillNo} · <span class="chip ${o.status}">${statusLabel(o.status)}</span>`;
+      item.addEventListener("click", () => {
+        openBillModal(o);
+        searchResults.classList.add("hidden");
+        globalSearch.value = "";
+      });
+      searchResults.appendChild(item);
+    });
+  }
+  searchResults.classList.remove("hidden");
+}
+
 // ---------- Tabs ----------
 function activateTab(tabName) {
   document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
   document.querySelector(`.tab-btn[data-tab="${tabName}"]`).classList.add("active");
   document.querySelectorAll("main > section").forEach((s) => s.classList.add("hidden"));
   document.getElementById(`tab-${tabName}`).classList.remove("hidden");
+  if (tabName === "dashboard") refreshDashboard();
   if (tabName === "orders") refreshOrders();
   if (tabName === "transactions") {
     const activeSub = document.querySelector('.subtab-btn[data-parent="transactions"].active')?.dataset.subtab;
@@ -151,6 +211,67 @@ async function initCustomerAndUI() {
     statusSelect.appendChild(opt);
   });
   await refreshOrders();
+  await refreshDashboard();
+}
+
+// ---------- Dashboard ----------
+async function refreshDashboard() {
+  const orders = await fetchAllOrdersForDashboard(CUSTOMER_ID);
+  const today = new Date().toISOString().slice(0, 10);
+  const isToday = (iso) => !!iso && iso.slice(0, 10) === today;
+  const countBy = (pred) => orders.filter(pred).length;
+
+  const cards = [
+    { label: "Total bills", value: orders.length },
+    { label: "Received", value: countBy((o) => o.status === "received") },
+    { label: "Processing", value: countBy((o) => o.status === "processing") },
+    { label: "Packed", value: countBy((o) => o.status === "packed") },
+    { label: "Dispatched", value: countBy((o) => o.status === "dispatched") },
+    { label: "Delivered", value: countBy((o) => o.status === "delivered") },
+    { label: "Cancelled", value: countBy((o) => o.status === "cancelled") },
+    { label: "Today's bills", value: countBy((o) => isToday(o.createdAt)) },
+    { label: "Today's packed", value: countBy((o) => isToday(o.packedAt)) },
+    { label: "Today's dispatch", value: countBy((o) => isToday(o.dispatchedAt)) },
+  ];
+  document.getElementById("dash-cards").innerHTML = cards.map((c) => `
+    <div class="dash-card"><div class="dc-value">${c.value}</div><div class="dc-label">${c.label}</div></div>
+  `).join("");
+
+  renderBarChart("chart-status", workflowStages.map((s) => ({
+    label: s.name, value: countBy((o) => o.status === s.id),
+  })));
+
+  const last7 = [...Array(7)].map((_, i) => {
+    const d = new Date(); d.setDate(d.getDate() - (6 - i));
+    return d.toISOString().slice(0, 10);
+  });
+  const shortDate = (iso) => iso.slice(5).replace("-", "/");
+  renderBarChart("chart-packing", last7.map((d) => ({
+    label: shortDate(d), value: countBy((o) => o.packedAt && o.packedAt.slice(0, 10) === d),
+  })));
+  renderBarChart("chart-dispatch", last7.map((d) => ({
+    label: shortDate(d), value: countBy((o) => o.dispatchedAt && o.dispatchedAt.slice(0, 10) === d),
+  })));
+
+  const byOperator = {};
+  orders.forEach((o) => { if (o.packedBy) byOperator[o.packedBy] = (byOperator[o.packedBy] || 0) + 1; });
+  renderBarChart("chart-operator", Object.entries(byOperator).map(([label, value]) => ({ label, value })));
+}
+
+function renderBarChart(containerId, rows) {
+  const el = document.getElementById(containerId);
+  const max = Math.max(1, ...rows.map((r) => r.value));
+  if (rows.every((r) => r.value === 0)) {
+    el.innerHTML = `<div class="empty-state">No data yet.</div>`;
+    return;
+  }
+  el.innerHTML = rows.map((r) => `
+    <div class="bar-row">
+      <span class="br-label" title="${r.label}">${r.label}</span>
+      <span class="br-track"><span class="br-fill" style="width:${(r.value / max) * 100}%"></span></span>
+      <span class="br-value">${r.value}</span>
+    </div>
+  `).join("");
 }
 
 function buildItemPicker(catalog) {
@@ -274,7 +395,7 @@ document.getElementById("btn-save-print").addEventListener("click", async () => 
       totalBillValue: summary.total,
       createdBy: currentUserEmail,
     };
-    await createOrder(order);
+    order.id = await createOrder(order);
     printReceipt(order);
     saveMsg.textContent = `Saved — ${uniqueCode}`;
     saveMsg.className = "ok";
@@ -321,6 +442,7 @@ async function printReceipt(order) {
   document.getElementById("r-qr-img").src = await qrDataUrl(order.uniqueCode || order.docketNo);
 
   printElement("print-receipt", "size:101.6mm 152.4mm; margin:0;");
+  if (order.id) logStatusHistory(order.id, "receipt printed", currentUserEmail).catch(() => {});
 }
 
 // ---------- Import from Excel ----------
@@ -548,6 +670,7 @@ async function printStickers(order, packetCount) {
     list.appendChild(sticker);
   }
   printElement("print-stickers", "size:101.6mm 50.8mm; margin:0;");
+  if (order.id) logStatusHistory(order.id, "stickers printed", currentUserEmail, `${packetCount} packet(s)`).catch(() => {});
 }
 
 async function printLabel(order) {
@@ -876,4 +999,5 @@ async function printTransferNote(note, orders) {
   });
   document.getElementById("tn-print-total-label").textContent = `Total — ${orders.length} bills, ${note.totalPackets ?? orders.reduce((s,o)=>s+(o.packetCount||0),0)} packets`;
   printElement("print-transfer", "size:A4; margin:16mm;");
+  orders.forEach((o) => logStatusHistory(o.id, "transfer note printed", currentUserEmail, note.transferNo).catch(() => {}));
 }

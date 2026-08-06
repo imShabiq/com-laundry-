@@ -154,6 +154,7 @@ function rowToOrder(row) {
     packedAt: row.packed_at,
     dispatchedBy: row.dispatched_by,
     dispatchedAt: row.dispatched_at,
+    createdAt: row.created_at,
   };
 }
 
@@ -265,6 +266,31 @@ export async function fetchTransferNotes(customerId) {
     .limit(100);
   if (error) throw error;
   return data.map(rowToTransferNote);
+}
+
+export async function searchOrders(customerId, query) {
+  const q = `%${query}%`;
+  const cols = ["unique_code", "docket_no", "bill_number", "room_number", "room_or_bill_no", "guest_name", "customer_mobile"];
+  const { data, error } = await supabase
+    .from("orders")
+    .select("*")
+    .eq("customer_id", customerId)
+    .or(cols.map((c) => `${c}.ilike.${q}`).join(","))
+    .order("created_at", { ascending: false })
+    .limit(20);
+  if (error) throw error;
+  return data.map(rowToOrder);
+}
+
+export async function fetchAllOrdersForDashboard(customerId) {
+  const { data, error } = await supabase
+    .from("orders")
+    .select("*")
+    .eq("customer_id", customerId)
+    .order("created_at", { ascending: false })
+    .limit(5000);
+  if (error) throw error;
+  return data.map(rowToOrder);
 }
 
 export async function fetchOrdersByIds(orderIds) {

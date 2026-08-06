@@ -27,6 +27,10 @@
 <div id="view-app" class="hidden">
   <header class="topbar">
     <div class="brand"><h1>LaundroPlus</h1><span>Bill &amp; Pack</span></div>
+    <div class="topbar-search">
+      <input type="text" id="global-search" placeholder="Search or scan a receipt, bill no., room, customer, phone…" autocomplete="off">
+      <div class="search-results hidden" id="search-results"></div>
+    </div>
     <div class="topbar-right">
       <span id="user-email"></span>
       <button id="btn-logout">Sign out</button>
@@ -34,8 +38,9 @@
   </header>
 
   <nav class="tabs">
+    <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
     <div class="tab-dropdown">
-      <button class="tab-btn active" id="collection-tab-btn" data-tab="entry" aria-haspopup="true" aria-expanded="false">
+      <button class="tab-btn" id="collection-tab-btn" data-tab="entry" aria-haspopup="true" aria-expanded="false">
         Collection <span class="caret">▾</span>
       </button>
       <div class="tab-dropdown-menu hidden" id="collection-dropdown-menu">
@@ -48,8 +53,31 @@
   </nav>
 
   <main>
+    <!-- DASHBOARD -->
+    <section id="tab-dashboard">
+      <div class="dash-cards" id="dash-cards"></div>
+      <div class="dash-charts">
+        <div class="panel">
+          <h2>Bills by status</h2>
+          <div class="bar-chart" id="chart-status"></div>
+        </div>
+        <div class="panel">
+          <h2>Daily packing (last 7 days)</h2>
+          <div class="bar-chart" id="chart-packing"></div>
+        </div>
+        <div class="panel">
+          <h2>Daily dispatch (last 7 days)</h2>
+          <div class="bar-chart" id="chart-dispatch"></div>
+        </div>
+        <div class="panel">
+          <h2>Operator productivity (packed)</h2>
+          <div class="bar-chart" id="chart-operator"></div>
+        </div>
+      </div>
+    </section>
+
     <!-- COLLECTION -->
-    <section id="tab-entry">
+    <section id="tab-entry" class="hidden">
 
       <div id="subtab-upload">
         <div class="panel">
