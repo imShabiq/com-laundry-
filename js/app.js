@@ -4,7 +4,7 @@ import {
   generateUniqueCode, generateUniqueCodes, fetchOrders, updateOrderStatus, savePacking,
   fetchPackedUnassignedOrders, createTransferNote, fetchTransferNotes, fetchOrdersByIds,
   fetchWorkflowStages, fetchStatusHistory, changeOrderStatus, logStatusHistory, searchOrders,
-  fetchAllOrdersForDashboard,
+  fetchAllOrdersForDashboard, fetchOrCreateUserRole,
 } from "./db.js";
 import { SERVICE_TYPES, statusLabel } from "./constants.js";
 import { parseProductionSummary } from "./xlsx-import.js";
@@ -42,6 +42,9 @@ watchAuth(async (user) => {
     viewApp.classList.remove("hidden");
     document.getElementById("user-email").textContent = user.email;
     currentUserEmail = user.email;
+    fetchOrCreateUserRole(user.email)
+      .then((role) => { document.getElementById("user-role").textContent = role; })
+      .catch(() => {});
     await initCustomerAndUI();
   } else {
     viewApp.classList.add("hidden");

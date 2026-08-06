@@ -212,6 +212,14 @@ export async function changeOrderStatus(orderId, stage, changedBy, remarks) {
   await logStatusHistory(orderId, stage, changedBy, remarks);
 }
 
+export async function fetchOrCreateUserRole(email) {
+  const { data: existing } = await supabase.from("user_roles").select("*").eq("email", email).maybeSingle();
+  if (existing) return existing.role;
+  const { data, error } = await supabase.from("user_roles").insert({ email, role: "operator" }).select().single();
+  if (error) throw error;
+  return data.role;
+}
+
 export async function fetchPackedUnassignedOrders(customerId) {
   const { data, error } = await supabase
     .from("orders")
