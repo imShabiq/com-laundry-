@@ -150,6 +150,8 @@ function rowToOrder(row) {
     packetCount: row.packet_count,
     packedBy: row.packed_by,
     packedAt: row.packed_at,
+    dispatchedBy: row.dispatched_by,
+    dispatchedAt: row.dispatched_at,
   };
 }
 
@@ -173,19 +175,24 @@ export async function fetchPackedUnassignedOrders(customerId) {
     .eq("customer_id", customerId)
     .eq("status", "packed")
     .is("transfer_note_id", null)
-    .order("order_date", { ascending: true });
+    .order("packed_at", { ascending: false });
   if (error) throw error;
   return data.map(rowToOrder);
 }
 
-export async function createTransferNote({ customerId, transferNo, orders }) {
+export async function createTransferNote({ customerId, transferNo, driverName, vehicleNumber, destinationOutlet, orders, dispatchedBy }) {
+  const totalPackets = orders.reduce((s, o) => s + (o.packetCount || 0), 0);
   const { data: note, error } = await supabase
     .from("transfer_notes")
     .insert({
       customer_id: customerId,
       transfer_no: transferNo,
+      driver_name: driverName,
+      vehicle_number: vehicleNumber,
+      destination_outlet: destinationOutlet,
       order_ids: orders.map((o) => o.id),
       total_pieces: orders.reduce((s, o) => s + o.totalPieces, 0),
+      total_packets: totalPackets,
     })
     .select()
     .single();
@@ -193,7 +200,12 @@ export async function createTransferNote({ customerId, transferNo, orders }) {
 
   const { error: updateError } = await supabase
     .from("orders")
-    .update({ status: "dispatched", transfer_note_id: note.id })
+    .update({
+      status: "dispatched",
+      transfer_note_id: note.id,
+      dispatched_by: dispatchedBy,
+      dispatched_at: new Date().toISOString(),
+    })
     .in("id", orders.map((o) => o.id));
   if (updateError) throw updateError;
 
@@ -226,5 +238,9 @@ function rowToTransferNote(row) {
     transferDate: row.transfer_date,
     orderIds: row.order_ids,
     totalPieces: row.total_pieces,
+    driverName: row.driver_name,
+    vehicleNumber: row.vehicle_number,
+    destinationOutlet: row.destination_outlet,
+    totalPackets: row.total_packets,
   };
 }

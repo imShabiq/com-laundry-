@@ -164,11 +164,11 @@
       <div id="orders-empty" class="empty-state hidden">No orders yet — upload a workbook or enter one manually.</div>
     </section>
 
-    <!-- 4. TRANSACTIONS: Packing (scan) + Transfer Note -->
+    <!-- 4. TRANSACTIONS: Packing (scan) + Dispatch -->
     <section id="tab-transactions" class="hidden">
       <nav class="subtabs">
         <button class="subtab-btn active" data-parent="transactions" data-subtab="packing">Packing (Scan)</button>
-        <button class="subtab-btn" data-parent="transactions" data-subtab="transfer">Transfer Note</button>
+        <button class="subtab-btn" data-parent="transactions" data-subtab="dispatch">Dispatch</button>
       </nav>
 
       <div id="subtab-packing">
@@ -199,24 +199,52 @@
         </div>
       </div>
 
-      <div id="subtab-transfer" class="hidden">
+      <div id="subtab-dispatch" class="hidden">
         <div class="panel">
-          <h2>Create a transfer note</h2>
-          <p class="muted">Pick the packed bills going out on this delivery run, then close &amp; print — it's what the driver carries and the hotel signs against.</p>
-          <div class="field-row">
-            <div class="field">
+          <h2>Packed bills ready for dispatch</h2>
+          <p class="muted">Select the bills going out on this run, fill in the delivery details, then Create Dispatch — it generates the printed Transfer Note the driver carries.</p>
+
+          <div class="filter-bar">
+            <div class="field" style="width:220px;">
+              <label for="tn-search">Search</label>
+              <input type="text" id="tn-search" placeholder="Receipt, bill no., room, customer…">
+            </div>
+            <div class="field" style="width:170px;">
               <label for="tn-customer">Location / hotel</label>
               <select id="tn-customer"><option value="sheraton">Sheraton</option></select>
             </div>
+            <span class="filter-count" id="tn-filter-count"></span>
           </div>
+
           <div class="tbl-wrap">
             <table>
-              <thead><tr><th></th><th>Docket</th><th>Date</th><th>Room / bill no.</th><th>Pieces</th></tr></thead>
+              <thead>
+                <tr>
+                  <th><input type="checkbox" id="tn-select-all"></th>
+                  <th>Receipt code</th><th>Bill no.</th><th>Customer</th><th>Room no.</th>
+                  <th>Packets</th><th>Packing time</th><th>Operator</th><th>Status</th>
+                </tr>
+              </thead>
               <tbody id="tn-candidates-body"></tbody>
             </table>
-            <div id="tn-candidates-empty" class="empty-state hidden">No packed bills waiting to be transferred for this location.</div>
+            <div id="tn-candidates-empty" class="empty-state hidden">No packed bills waiting to be dispatched for this location.</div>
           </div>
-          <button class="btn-primary" id="btn-create-transfer" style="max-width:280px;">Close &amp; print transfer note</button>
+
+          <div class="field-row" style="margin-top:20px;">
+            <div class="field">
+              <label for="tn-driver">Driver name</label>
+              <input type="text" id="tn-driver" placeholder="e.g. Kamal Perera">
+            </div>
+            <div class="field">
+              <label for="tn-vehicle">Vehicle number (optional)</label>
+              <input type="text" id="tn-vehicle" placeholder="e.g. WP CAB-1234">
+            </div>
+            <div class="field">
+              <label for="tn-destination">Destination outlet</label>
+              <input type="text" id="tn-destination" placeholder="e.g. Sheraton Colombo">
+            </div>
+          </div>
+          <button class="btn-primary" id="btn-create-transfer" style="max-width:280px;">Create dispatch &amp; print transfer note</button>
           <div id="transfer-msg"></div>
         </div>
 
@@ -224,7 +252,7 @@
           <h2>Past transfer notes</h2>
           <div class="tbl-wrap">
             <table>
-              <thead><tr><th>Transfer No.</th><th>Date</th><th>Bills</th><th>Pieces</th><th></th></tr></thead>
+              <thead><tr><th>Transfer No.</th><th>Date</th><th>Driver</th><th>Destination</th><th>Bills</th><th>Packets</th><th></th></tr></thead>
               <tbody id="tn-history-body"></tbody>
             </table>
             <div id="tn-history-empty" class="empty-state hidden">No transfer notes yet.</div>
@@ -313,8 +341,12 @@
       <span id="tn-print-customer"></span>
       <span id="tn-print-date"></span>
     </div>
+    <div class="d-meta" style="margin-top:-8px;">
+      <span id="tn-print-driver"></span>
+      <span id="tn-print-destination"></span>
+    </div>
     <table>
-      <thead><tr><th>Docket</th><th>Room / bill no.</th><th style="text-align:right">Pieces</th></tr></thead>
+      <thead><tr><th>Receipt code</th><th>Bill no.</th><th>Room no.</th><th style="text-align:right">Packets</th></tr></thead>
       <tbody id="tn-print-lines"></tbody>
     </table>
     <div class="d-total"><span id="tn-print-total-label">Total</span><span></span></div>

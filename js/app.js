@@ -56,7 +56,7 @@ function activateTab(tabName) {
   if (tabName === "transactions") {
     const activeSub = document.querySelector('.subtab-btn[data-parent="transactions"].active')?.dataset.subtab;
     if (activeSub === "packing") document.getElementById("scan-input").focus();
-    if (activeSub === "transfer") refreshTransferTab();
+    if (activeSub === "dispatch") refreshTransferTab();
   }
 }
 
@@ -107,7 +107,7 @@ document.querySelectorAll(".subtab-btn").forEach((btn) => {
     document.querySelectorAll(`#tab-${parent} > [id^="subtab-"]`).forEach((s) => s.classList.add("hidden"));
     document.getElementById(`subtab-${btn.dataset.subtab}`).classList.remove("hidden");
     if (btn.dataset.subtab === "packing") document.getElementById("scan-input").focus();
-    if (btn.dataset.subtab === "transfer") refreshTransferTab();
+    if (btn.dataset.subtab === "dispatch") refreshTransferTab();
   });
 });
 
@@ -677,57 +677,102 @@ billModal.addEventListener("click", (e) => { if (e.target === billModal) billMod
 document.getElementById("bm-print-receipt").addEventListener("click", () => modalOrder && printReceipt(modalOrder));
 document.getElementById("bm-print-label").addEventListener("click", () => modalOrder && printLabel(modalOrder));
 
-// ---------- Transactions: Transfer Note ----------
+// ---------- Transactions: Dispatch ----------
 let transferCandidates = [];
 const selectedForTransfer = new Set();
 
 async function refreshTransferTab() {
   transferCandidates = await fetchPackedUnassignedOrders(CUSTOMER_ID);
   selectedForTransfer.clear();
+  document.getElementById("tn-select-all").checked = false;
   renderTransferCandidates();
   await renderTransferHistory();
 }
 
+function visibleTransferCandidates() {
+  const q = document.getElementById("tn-search").value.trim().toLowerCase();
+  if (!q) return transferCandidates;
+  return transferCandidates.filter((o) =>
+    [o.uniqueCode, o.docketNo, o.billNumber, o.roomOrBillNo, o.roomNumber, o.guestName, o.customerName]
+      .filter(Boolean).some((v) => String(v).toLowerCase().includes(q))
+  );
+}
+
 function renderTransferCandidates() {
+  const rows = visibleTransferCandidates();
   const tbody = document.getElementById("tn-candidates-body");
   const empty = document.getElementById("tn-candidates-empty");
   tbody.innerHTML = "";
-  empty.classList.toggle("hidden", transferCandidates.length > 0);
+  empty.classList.toggle("hidden", rows.length > 0);
+  document.getElementById("tn-filter-count").textContent =
+    `${rows.length} of ${transferCandidates.length} bills · ${selectedForTransfer.size} selected`;
 
-  transferCandidates.forEach((o) => {
+  rows.forEach((o) => {
     const tr = document.createElement("tr");
     const td = document.createElement("td");
     const cb = document.createElement("input");
     cb.type = "checkbox";
+    cb.checked = selectedForTransfer.has(o.id);
     cb.addEventListener("change", () => {
       if (cb.checked) selectedForTransfer.add(o.id);
       else selectedForTransfer.delete(o.id);
+      document.getElementById("tn-filter-count").textContent =
+        `${rows.length} of ${transferCandidates.length} bills · ${selectedForTransfer.size} selected`;
     });
     td.appendChild(cb);
     tr.appendChild(td);
-    tr.insertAdjacentHTML("beforeend", `<td>${o.docketNo}</td><td>${o.orderDate}</td><td>${o.roomOrBillNo}</td><td class="num">${o.totalPieces}</td>`);
+    const packedTime = o.packedAt ? new Date(o.packedAt).toLocaleString() : "—";
+    tr.insertAdjacentHTML("beforeend", `
+      <td>${o.uniqueCode || o.docketNo}</td>
+      <td>${o.billNumber || o.roomOrBillNo}</td>
+      <td>${o.guestName || o.customerName || "—"}</td>
+      <td>${o.roomNumber || o.roomOrBillNo}</td>
+      <td class="num">${o.packetCount ?? "—"}</td>
+      <td>${packedTime}</td>
+      <td>${o.packedBy || "—"}</td>
+      <td><span class="chip ${o.status}">${statusLabel(o.status)}</span></td>
+    `);
     tbody.appendChild(tr);
   });
 }
+
+document.getElementById("tn-search").addEventListener("input", renderTransferCandidates);
+
+document.getElementById("tn-select-all").addEventListener("change", (e) => {
+  const rows = visibleTransferCandidates();
+  rows.forEach((o) => { if (e.target.checked) selectedForTransfer.add(o.id); else selectedForTransfer.delete(o.id); });
+  renderTransferCandidates();
+});
 
 document.getElementById("btn-create-transfer").addEventListener("click", async () => {
   const msg = document.getElementById("transfer-msg");
   const btn = document.getElementById("btn-create-transfer");
   const chosen = transferCandidates.filter((o) => selectedForTransfer.has(o.id));
+  const driverName = document.getElementById("tn-driver").value.trim();
+  const vehicleNumber = document.getElementById("tn-vehicle").value.trim();
+  const destinationOutlet = document.getElementById("tn-destination").value.trim();
+
   if (chosen.length === 0) { msg.textContent = "Tick at least one bill."; msg.className = "err"; return; }
+  if (!driverName) { msg.textContent = "Enter a driver name."; msg.className = "err"; return; }
 
   btn.disabled = true;
-  msg.textContent = "Creating transfer note…";
+  msg.textContent = "Creating dispatch…";
   msg.className = "";
   try {
     const transferNo = `TN-${customer.code}-${makeDocketNo("").replace(/^-/, "")}`;
-    const note = await createTransferNote({ customerId: CUSTOMER_ID, transferNo, orders: chosen });
+    const note = await createTransferNote({
+      customerId: CUSTOMER_ID, transferNo, driverName, vehicleNumber, destinationOutlet,
+      orders: chosen, dispatchedBy: currentUserEmail,
+    });
     await printTransferNote(note, chosen);
-    msg.textContent = `Transfer note ${note.transferNo} created — ${chosen.length} bills marked dispatched.`;
+    msg.textContent = `Transfer note ${note.transferNo} created — ${chosen.length} bills dispatched.`;
     msg.className = "ok";
+    document.getElementById("tn-driver").value = "";
+    document.getElementById("tn-vehicle").value = "";
+    document.getElementById("tn-destination").value = "";
     await refreshTransferTab();
   } catch (err) {
-    msg.textContent = "Could not create transfer note — check connection and try again.";
+    msg.textContent = "Could not create dispatch — check connection and try again.";
     msg.className = "err";
   } finally {
     btn.disabled = false;
@@ -743,7 +788,11 @@ async function renderTransferHistory() {
 
   notes.forEach((n) => {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${n.transferNo}</td><td>${n.transferDate}</td><td class="num">${n.orderIds.length}</td><td class="num">${n.totalPieces}</td><td class="row-actions"></td>`;
+    tr.innerHTML = `
+      <td>${n.transferNo}</td><td>${n.transferDate}</td><td>${n.driverName || "—"}</td>
+      <td>${n.destinationOutlet || "—"}</td><td class="num">${n.orderIds.length}</td>
+      <td class="num">${n.totalPackets ?? "—"}</td><td class="row-actions"></td>
+    `;
     const btn = document.createElement("button");
     btn.textContent = "Reprint";
     btn.addEventListener("click", async () => {
@@ -756,16 +805,18 @@ async function renderTransferHistory() {
 }
 
 async function printTransferNote(note, orders) {
-  document.getElementById("tn-ref").innerHTML = `${note.transferNo}`;
+  document.getElementById("tn-ref").innerHTML = `${note.transferNo}<br>${note.transferDate}`;
   document.getElementById("tn-print-customer").innerHTML = `<b>${customer.name}</b>`;
-  document.getElementById("tn-print-date").textContent = note.transferDate;
+  document.getElementById("tn-print-date").textContent = note.vehicleNumber ? `Vehicle: ${note.vehicleNumber}` : "";
+  document.getElementById("tn-print-driver").innerHTML = `Driver: <b>${note.driverName || "—"}</b>`;
+  document.getElementById("tn-print-destination").innerHTML = `Destination: <b>${note.destinationOutlet || "—"}</b>`;
   const tbody = document.getElementById("tn-print-lines");
   tbody.innerHTML = "";
   orders.forEach((o) => {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${o.docketNo}</td><td>${o.roomOrBillNo}</td><td style="text-align:right">${o.totalPieces}</td>`;
+    tr.innerHTML = `<td>${o.uniqueCode || o.docketNo}</td><td>${o.billNumber || o.roomOrBillNo}</td><td>${o.roomNumber || o.roomOrBillNo}</td><td style="text-align:right">${o.packetCount ?? "—"}</td>`;
     tbody.appendChild(tr);
   });
-  document.getElementById("tn-print-total-label").textContent = `Total — ${orders.length} bills, ${note.totalPieces} pcs`;
+  document.getElementById("tn-print-total-label").textContent = `Total — ${orders.length} bills, ${note.totalPackets ?? orders.reduce((s,o)=>s+(o.packetCount||0),0)} packets`;
   printElement("print-transfer", "size:A4; margin:16mm;");
 }
