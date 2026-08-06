@@ -3,6 +3,7 @@ import {
   getCustomer, createOrder, createOrders, getOrderByDocketNo, getOrderByUniqueCode, makeDocketNo,
   generateUniqueCode, generateUniqueCodes, fetchOrders, updateOrderStatus, savePacking,
   fetchPackedUnassignedOrders, createTransferNote, fetchTransferNotes, fetchOrdersByIds,
+  fetchWorkflowStages, fetchStatusHistory, changeOrderStatus,
 } from "./db.js";
 import { SERVICE_TYPES, statusLabel } from "./constants.js";
 import { parseProductionSummary } from "./xlsx-import.js";
@@ -12,6 +13,7 @@ import { printElement } from "./print.js";
 const CUSTOMER_ID = "sheraton";
 let customer = null;
 let currentUserEmail = "";
+let workflowStages = [];
 
 // ---------- Auth ----------
 const viewLogin = document.getElementById("view-login");
@@ -139,6 +141,15 @@ async function initCustomerAndUI() {
   buildItemPicker(customer.catalog);
   wireSummaryRecalc();
   recalcSummary();
+  workflowStages = await fetchWorkflowStages();
+  const statusSelect = document.getElementById("bm-status-select");
+  statusSelect.innerHTML = "";
+  workflowStages.forEach((s) => {
+    const opt = document.createElement("option");
+    opt.value = s.id;
+    opt.textContent = s.name;
+    statusSelect.appendChild(opt);
+  });
   await refreshOrders();
 }
 
@@ -261,6 +272,7 @@ document.getElementById("btn-save-print").addEventListener("click", async () => 
       surchargeValue: summary.surcharge,
       pickupFee: summary.pickup,
       totalBillValue: summary.total,
+      createdBy: currentUserEmail,
     };
     await createOrder(order);
     printReceipt(order);
@@ -392,7 +404,7 @@ document.getElementById("btn-confirm-import").addEventListener("click", async ()
     const codes = await generateUniqueCodes(CUSTOMER_ID, visibleImport.length);
     const toImport = visibleImport.map((o, i) => ({ ...o, uniqueCode: codes[i].uniqueCode, receiptNumber: codes[i].receiptNumber }));
     status.textContent = "Importing…";
-    const created = await createOrders(toImport);
+    const created = await createOrders(toImport, currentUserEmail);
     status.textContent = `Imported ${created.length} bills. Preparing QR tags to print…`;
     await printTagSheet(created);
     status.textContent = `Imported and tagged ${created.length} bills. Attach a tag to each bag before wash.`;
@@ -669,13 +681,58 @@ function openBillModal(order) {
     <span>Pickup Rs ${order.pickupFee}</span>
     <b>Total Rs ${order.totalBillValue}</b>
   `;
+
+  document.getElementById("bm-status-select").value = order.status;
+  document.getElementById("bm-status-remarks").value = "";
+  document.getElementById("bm-status-msg").textContent = "";
+  loadBillHistory(order.id);
+
   billModal.classList.remove("hidden");
+}
+
+async function loadBillHistory(orderId) {
+  const box = document.getElementById("bm-history");
+  box.innerHTML = "Loading history…";
+  try {
+    const history = await fetchStatusHistory(orderId);
+    if (history.length === 0) { box.innerHTML = ""; return; }
+    box.innerHTML = `<div style="font-weight:600; color:var(--ink); margin-bottom:4px;">History</div>` + history.map((h) => `
+      <div class="h-row">
+        <span>${new Date(h.createdAt).toLocaleString()}</span>
+        <b>${statusLabel(h.stage)}</b>
+        <span>${h.changedBy || "—"}</span>
+        ${h.remarks ? `<span>· ${h.remarks}</span>` : ""}
+      </div>
+    `).join("");
+  } catch (err) {
+    box.innerHTML = "";
+  }
 }
 
 document.getElementById("bm-close").addEventListener("click", () => billModal.classList.add("hidden"));
 billModal.addEventListener("click", (e) => { if (e.target === billModal) billModal.classList.add("hidden"); });
 document.getElementById("bm-print-receipt").addEventListener("click", () => modalOrder && printReceipt(modalOrder));
 document.getElementById("bm-print-label").addEventListener("click", () => modalOrder && printLabel(modalOrder));
+
+document.getElementById("bm-status-save").addEventListener("click", async () => {
+  const msg = document.getElementById("bm-status-msg");
+  if (!modalOrder) return;
+  const stage = document.getElementById("bm-status-select").value;
+  const remarks = document.getElementById("bm-status-remarks").value.trim();
+  msg.textContent = "Saving…";
+  msg.className = "";
+  try {
+    await changeOrderStatus(modalOrder.id, stage, currentUserEmail, remarks);
+    modalOrder.status = stage;
+    msg.textContent = `Status updated to ${statusLabel(stage)}.`;
+    msg.className = "ok";
+    loadBillHistory(modalOrder.id);
+    refreshOrders();
+  } catch (err) {
+    msg.textContent = "Could not update status — check connection and try again.";
+    msg.className = "err";
+  }
+});
 
 // ---------- Transactions: Dispatch ----------
 let transferCandidates = [];

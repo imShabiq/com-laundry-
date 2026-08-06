@@ -282,6 +282,21 @@
       <button id="bm-print-receipt" class="btn-ghost">Reprint receipt</button>
       <button id="bm-print-label" class="btn-ghost">Reprint label</button>
     </div>
+
+    <div class="modal-status-row">
+      <div class="field" style="max-width:200px;">
+        <label for="bm-status-select">Change status</label>
+        <select id="bm-status-select"></select>
+      </div>
+      <div class="field">
+        <label for="bm-status-remarks">Remarks (optional)</label>
+        <input type="text" id="bm-status-remarks" placeholder="Reason / note">
+      </div>
+      <button class="btn-primary" id="bm-status-save" style="width:auto; margin-top:20px;">Update</button>
+    </div>
+    <div id="bm-status-msg"></div>
+
+    <div id="bm-history"></div>
   </div>
 </div>
 

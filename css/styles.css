@@ -197,8 +197,12 @@ tbody tr:hover{background:var(--accent-wash);}
 
 .chip{display:inline-flex; align-items:center; gap:5px; font-size:11px; padding:3px 9px; border-radius:5px; font-weight:600;}
 .chip.received{background:var(--amber-wash); color:var(--amber);}
+.chip.processing{background:var(--accent-wash); color:var(--accent-strong);}
 .chip.packed{background:var(--accent-wash); color:var(--accent-strong);}
 .chip.dispatched{background:var(--green-wash); color:var(--green);}
+.chip.delivered{background:var(--green-wash); color:var(--green);}
+.chip.returned{background:var(--red-wash); color:var(--red);}
+.chip.cancelled{background:var(--red-wash); color:var(--red);}
 
 .row-actions{display:flex; gap:6px;}
 .row-actions button{
@@ -250,6 +254,13 @@ tbody tr:hover{background:var(--accent-wash);}
 .modal-totals{display:flex; justify-content:flex-end; gap:24px; padding:12px 0; font-size:14px;}
 .modal-totals b{font-size:16px;}
 .modal-actions{display:flex; gap:10px; justify-content:flex-end; margin-top:10px;}
+.modal-status-row{display:flex; gap:14px; align-items:flex-end; margin-top:22px; padding-top:18px; border-top:1px solid var(--line);}
+#bm-status-msg{font-size:13px; margin-top:8px; min-height:1em;}
+#bm-status-msg.ok{color:var(--green);}
+#bm-status-msg.err{color:var(--red);}
+#bm-history{margin-top:16px; font-size:12.5px; color:var(--ink-muted);}
+#bm-history .h-row{display:flex; gap:10px; padding:4px 0;}
+#bm-history .h-row b{color:var(--ink); text-transform:capitalize;}
 
 /* ---------- Import & Scan ---------- */
 .muted{color:var(--ink-muted); font-size:13.5px;}

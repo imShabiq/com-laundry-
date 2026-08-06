@@ -87,12 +87,14 @@ function orderToRow(order) {
 export async function createOrder(order) {
   const { data, error } = await supabase.from("orders").insert(orderToRow(order)).select().single();
   if (error) throw error;
+  await logStatusHistory(data.id, "received", order.createdBy);
   return data.id;
 }
 
-export async function createOrders(orders) {
+export async function createOrders(orders, createdBy) {
   const { data, error } = await supabase.from("orders").insert(orders.map(orderToRow)).select();
   if (error) throw error;
+  await logStatusHistoryBulk(data.map((row) => row.id), "received", createdBy);
   return data.map(rowToOrder);
 }
 
@@ -166,6 +168,47 @@ export async function savePacking(orderId, packetCount, packedBy) {
     .update({ status: "packed", packet_count: packetCount, packed_by: packedBy, packed_at: new Date().toISOString() })
     .eq("id", orderId);
   if (error) throw error;
+  await logStatusHistory(orderId, "packed", packedBy, `${packetCount} packet(s)`);
+}
+
+// ---------- Configurable workflow ----------
+export async function fetchWorkflowStages() {
+  const { data, error } = await supabase
+    .from("workflow_stages")
+    .select("*")
+    .eq("is_active", true)
+    .order("sort_order", { ascending: true });
+  if (error) throw error;
+  return data.map((row) => ({ id: row.id, name: row.name, sortOrder: row.sort_order, color: row.color }));
+}
+
+export async function logStatusHistory(orderId, stage, changedBy, remarks) {
+  const { error } = await supabase.from("status_history").insert({ order_id: orderId, stage, changed_by: changedBy, remarks });
+  if (error) throw error;
+}
+
+async function logStatusHistoryBulk(orderIds, stage, changedBy) {
+  if (!orderIds.length) return;
+  const { error } = await supabase
+    .from("status_history")
+    .insert(orderIds.map((orderId) => ({ order_id: orderId, stage, changed_by: changedBy })));
+  if (error) throw error;
+}
+
+export async function fetchStatusHistory(orderId) {
+  const { data, error } = await supabase
+    .from("status_history")
+    .select("*")
+    .eq("order_id", orderId)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return data.map((row) => ({ stage: row.stage, changedBy: row.changed_by, remarks: row.remarks, createdAt: row.created_at }));
+}
+
+export async function changeOrderStatus(orderId, stage, changedBy, remarks) {
+  const { error } = await supabase.from("orders").update({ status: stage }).eq("id", orderId);
+  if (error) throw error;
+  await logStatusHistory(orderId, stage, changedBy, remarks);
 }
 
 export async function fetchPackedUnassignedOrders(customerId) {
@@ -209,6 +252,7 @@ export async function createTransferNote({ customerId, transferNo, driverName, v
     .in("id", orders.map((o) => o.id));
   if (updateError) throw updateError;
 
+  await logStatusHistoryBulk(orders.map((o) => o.id), "dispatched", dispatchedBy);
   return rowToTransferNote(note);
 }
 
