@@ -34,18 +34,20 @@
   </header>
 
   <nav class="tabs">
-    <button class="tab-btn active" data-tab="entry">Upload / Enter Data</button>
+    <button class="tab-btn active" data-tab="entry">Collection</button>
     <button class="tab-btn" data-tab="orders">Order List</button>
     <button class="tab-btn" data-tab="transactions">Transactions</button>
   </nav>
 
   <main>
-    <!-- 1. UPLOAD / ENTER DATA -->
+    <!-- COLLECTION -->
     <section id="tab-entry">
-      <nav class="subtabs">
-        <button class="subtab-btn active" data-parent="entry" data-subtab="upload">Upload Excel</button>
-        <button class="subtab-btn" data-parent="entry" data-subtab="manual">Enter Manually</button>
-      </nav>
+      <div class="section-select-row">
+        <select id="entry-mode-select" class="section-select">
+          <option value="upload">Upload</option>
+          <option value="manual">Enter bill</option>
+        </select>
+      </div>
 
       <div id="subtab-upload">
         <div class="panel">

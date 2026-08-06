@@ -90,6 +90,16 @@ header.topbar{
 .tab-btn:hover{color:var(--ink);}
 .tab-btn.active{color:var(--accent-strong); border-bottom-color:var(--accent);}
 
+.section-select-row{margin-bottom:20px;}
+.section-select{
+  appearance:none; -webkit-appearance:none;
+  background:var(--panel) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%235B6B70'%3E%3Cpath d='M5.5 7.5l4.5 4.5 4.5-4.5' stroke='%235B6B70' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") right 12px center no-repeat;
+  background-size:16px;
+  border:1px solid var(--line); color:var(--ink); font-weight:600; font-size:14px;
+  padding:9px 36px 9px 14px; border-radius:8px; min-width:160px; cursor:pointer;
+}
+.section-select:hover{border-color:var(--ink-faint);}
+
 .subtabs{display:flex; gap:6px; margin-bottom:18px;}
 .subtab-btn{
   background:none; border:1px solid var(--line); color:var(--ink-muted);

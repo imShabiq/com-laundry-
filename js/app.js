@@ -59,6 +59,12 @@ document.querySelectorAll(".tab-btn").forEach((btn) => {
   });
 });
 
+// ---------- Collection: Upload / Enter bill dropdown ----------
+document.getElementById("entry-mode-select").addEventListener("change", (e) => {
+  document.querySelectorAll(`#tab-entry > [id^="subtab-"]`).forEach((s) => s.classList.add("hidden"));
+  document.getElementById(`subtab-${e.target.value}`).classList.remove("hidden");
+});
+
 // ---------- Sub-tabs ----------
 document.querySelectorAll(".subtab-btn").forEach((btn) => {
   btn.addEventListener("click", () => {
