@@ -463,24 +463,38 @@ function resetForm() {
 }
 
 // ---------- Print receipt (~4x6in) ----------
+async function buildReceiptHtml(order) {
+  const qr = await qrDataUrl(order.uniqueCode || order.docketNo);
+  const itemsHtml = order.lines.map((l, i) => `
+    <tr><td>${i + 1}</td><td>${l.item}</td><td style="text-align:right">${l.qty}</td></tr>
+  `).join("");
+  const serviceInitial = (order.serviceType?.name || "").trim().charAt(0).toUpperCase() || "-";
+  const packingInitial = (order.packingMethod || "Folded").trim().charAt(0).toUpperCase();
+  const locationCode = customer?.code || "";
+
+  return `
+    <div class="receipt">
+      <div class="r-top">
+        <div class="r-box r-code-box">${locationCode}</div>
+        <div class="r-box r-qr-box"><img src="${qr}" alt="QR"></div>
+      </div>
+      <div class="r-box r-unique-box">${order.uniqueCode || "—"}</div>
+      <div class="r-row2">
+        <div class="r-box r-qty-box">${order.totalPieces}</div>
+        <div class="r-box r-type-box">${serviceInitial} | ${packingInitial}</div>
+      </div>
+      <div class="r-box r-billno-box">${order.billNumber || order.roomOrBillNo || "—"}</div>
+      <table>
+        <thead><tr><th>#</th><th>Item</th><th style="text-align:right">Qty</th></tr></thead>
+        <tbody>${itemsHtml}</tbody>
+      </table>
+      <div class="r-total"><span>TOTAL QTY</span><b>${order.totalPieces}</b></div>
+    </div>
+  `;
+}
+
 async function printReceipt(order) {
-  document.getElementById("r-bill-number").textContent = order.billNumber || order.roomOrBillNo || "—";
-  document.getElementById("r-receipt-number").textContent = order.receiptNumber || "—";
-  document.getElementById("r-unique-code").textContent = order.uniqueCode || "—";
-  document.getElementById("r-customer-name").textContent = order.guestName || "—";
-  document.getElementById("r-room-number").textContent = order.roomNumber || order.roomOrBillNo || "—";
-  document.getElementById("r-packing-method").textContent = order.packingMethod || "Folded";
-
-  const tbody = document.getElementById("r-items");
-  tbody.innerHTML = "";
-  order.lines.forEach((l) => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${l.item}</td><td style="text-align:right">${l.qty}</td>`;
-    tbody.appendChild(tr);
-  });
-  document.getElementById("r-total-qty").textContent = order.totalPieces;
-  document.getElementById("r-qr-img").src = await qrDataUrl(order.uniqueCode || order.docketNo);
-
+  document.getElementById("receipt-single-slot").innerHTML = await buildReceiptHtml(order);
   printElement("print-receipt", "size:101.6mm 152.4mm; margin:0;");
   if (order.id) logStatusHistory(order.id, "receipt printed", currentUserEmail).catch(() => {});
 }
@@ -583,33 +597,9 @@ document.getElementById("btn-confirm-import").addEventListener("click", async ()
 
 async function printReceiptsBatch(orders) {
   const list = document.getElementById("receipts-batch-list");
-  list.innerHTML = "";
-  for (const o of orders) {
-    const qr = await qrDataUrl(o.uniqueCode || o.docketNo);
-    const itemsHtml = o.lines.map((l) => `<tr><td>${l.item}</td><td style="text-align:right">${l.qty}</td></tr>`).join("");
-    const div = document.createElement("div");
-    div.className = "receipt";
-    div.innerHTML = `
-      <div class="r-logo">🧺 LaundroPlus</div>
-      <div class="r-codes">
-        <div class="r-code-row"><span>Bill No.</span><b>${o.billNumber || o.roomOrBillNo || "—"}</b></div>
-        <div class="r-code-row"><span>Receipt No.</span><b>${o.receiptNumber || "—"}</b></div>
-        <div class="r-code-row r-unique"><span>Unique Code</span><b>${o.uniqueCode || "—"}</b></div>
-      </div>
-      <div class="r-qr"><img src="${qr}" alt="QR"></div>
-      <div class="r-customer">
-        <div><span>Customer</span><b>${o.guestName || "—"}</b></div>
-        <div><span>Room No.</span><b>${o.roomNumber || o.roomOrBillNo || "—"}</b></div>
-        <div><span>Packing</span><b>${o.packingMethod || "Folded"}</b></div>
-      </div>
-      <table>
-        <thead><tr><th>Item</th><th style="text-align:right">Qty</th></tr></thead>
-        <tbody>${itemsHtml}</tbody>
-      </table>
-      <div class="r-total"><span>TOTAL QTY</span><b>${o.totalPieces}</b></div>
-    `;
-    list.appendChild(div);
-  }
+  const parts = [];
+  for (const o of orders) parts.push(await buildReceiptHtml(o));
+  list.innerHTML = parts.join("");
   printElement("print-receipts-batch", "size:101.6mm 152.4mm; margin:0;");
   orders.forEach((o) => { if (o.id) logStatusHistory(o.id, "receipt printed", currentUserEmail).catch(() => {}); });
 }

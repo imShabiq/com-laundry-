@@ -349,25 +349,7 @@
 
 <!-- PRINT: RECEIPT, ~4x6in (populated by JS, only visible when printing) -->
 <div id="print-receipt" data-print-root>
-  <div class="receipt">
-    <div class="r-logo">LaundroPlus</div>
-    <div class="r-codes">
-      <div class="r-code-row"><span>Bill No.</span><b id="r-bill-number"></b></div>
-      <div class="r-code-row"><span>Receipt No.</span><b id="r-receipt-number"></b></div>
-      <div class="r-code-row r-unique"><span>Code</span><b id="r-unique-code"></b></div>
-    </div>
-    <div class="r-qr"><img id="r-qr-img" alt="QR"></div>
-    <div class="r-customer">
-      <div><span>Customer</span><b id="r-customer-name">—</b></div>
-      <div><span>Room No.</span><b id="r-room-number">—</b></div>
-      <div><span>Packing</span><b id="r-packing-method"></b></div>
-    </div>
-    <table>
-      <thead><tr><th>Item</th><th style="text-align:right">Qty</th></tr></thead>
-      <tbody id="r-items"></tbody>
-    </table>
-    <div class="r-total"><span>TOTAL QTY</span><b id="r-total-qty"></b></div>
-  </div>
+  <div id="receipt-single-slot"></div>
 </div>
 
 <!-- PRINT: RECEIPTS BATCH, one 4x6in receipt per imported bill -->
