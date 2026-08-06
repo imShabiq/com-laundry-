@@ -567,9 +567,9 @@ document.getElementById("btn-confirm-import").addEventListener("click", async ()
     const toImport = visibleImport.map((o, i) => ({ ...o, uniqueCode: codes[i].uniqueCode, receiptNumber: codes[i].receiptNumber }));
     status.textContent = "Importing…";
     const created = await createOrders(toImport, currentUserEmail);
-    status.textContent = `Imported ${created.length} bills. Preparing QR tags to print…`;
-    await printTagSheet(created);
-    status.textContent = `Imported and tagged ${created.length} bills. Attach a tag to each bag before wash.`;
+    status.textContent = `Imported ${created.length} bills. Preparing receipts to print…`;
+    await printReceiptsBatch(created);
+    status.textContent = `Imported ${created.length} bills and printed a receipt for each.`;
     document.getElementById("import-preview").classList.add("hidden");
     document.getElementById("import-file").value = "";
     pendingImport = [];
@@ -581,24 +581,37 @@ document.getElementById("btn-confirm-import").addEventListener("click", async ()
   }
 });
 
-async function printTagSheet(orders) {
-  const grid = document.getElementById("tag-grid");
-  grid.innerHTML = "";
+async function printReceiptsBatch(orders) {
+  const list = document.getElementById("receipts-batch-list");
+  list.innerHTML = "";
   for (const o of orders) {
     const qr = await qrDataUrl(o.uniqueCode || o.docketNo);
-    const tag = document.createElement("div");
-    tag.className = "tag";
-    tag.innerHTML = `
-      <img src="${qr}" alt="QR">
-      <div class="t-info">
-        <div class="t-room">${o.roomOrBillNo}</div>
-        <div>${o.orderDate} · ${o.serviceType.name}</div>
-        <div class="t-docket">${o.uniqueCode || o.docketNo}</div>
+    const itemsHtml = o.lines.map((l) => `<tr><td>${l.item}</td><td style="text-align:right">${l.qty}</td></tr>`).join("");
+    const div = document.createElement("div");
+    div.className = "receipt";
+    div.innerHTML = `
+      <div class="r-logo">🧺 LaundroPlus</div>
+      <div class="r-codes">
+        <div class="r-code-row"><span>Bill No.</span><b>${o.billNumber || o.roomOrBillNo || "—"}</b></div>
+        <div class="r-code-row"><span>Receipt No.</span><b>${o.receiptNumber || "—"}</b></div>
+        <div class="r-code-row r-unique"><span>Unique Code</span><b>${o.uniqueCode || "—"}</b></div>
       </div>
+      <div class="r-qr"><img src="${qr}" alt="QR"></div>
+      <div class="r-customer">
+        <div><span>Customer</span><b>${o.guestName || "—"}</b></div>
+        <div><span>Room No.</span><b>${o.roomNumber || o.roomOrBillNo || "—"}</b></div>
+        <div><span>Packing</span><b>${o.packingMethod || "Folded"}</b></div>
+      </div>
+      <table>
+        <thead><tr><th>Item</th><th style="text-align:right">Qty</th></tr></thead>
+        <tbody>${itemsHtml}</tbody>
+      </table>
+      <div class="r-total"><span>TOTAL QTY</span><b>${o.totalPieces}</b></div>
     `;
-    grid.appendChild(tag);
+    list.appendChild(div);
   }
-  printElement("print-tags", "size:A4; margin:12mm;");
+  printElement("print-receipts-batch", "size:101.6mm 152.4mm; margin:0;");
+  orders.forEach((o) => { if (o.id) logStatusHistory(o.id, "receipt printed", currentUserEmail).catch(() => {}); });
 }
 
 // ---------- Pack / Scan ----------

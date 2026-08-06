@@ -1,5 +1,5 @@
 :root{
-  --bg:#F1F4F3;
+  --bg:#f1f4f300;
   --panel:#FFFFFF;
   --panel-2:#F7FAF9;
   --ink:#1B2429;
@@ -317,25 +317,13 @@ tbody tr:hover{background:var(--accent-wash);}
 #pack-save-msg.err{color:var(--red);}
 
 /* ---------- Print docket / tags / label ---------- */
-#print-receipt, #print-tags, #print-label, #print-stickers, #print-transfer{display:none;}
+#print-receipt, #print-receipts-batch, #print-label, #print-stickers, #print-transfer{display:none;}
 @media print{
   body > *:not([data-print-root]){display:none !important;}
   [data-print-root].show{display:block !important;}
 }
-/* Default page size (docket, tag sheet). Label printing overrides this via an injected style — see print.js. */
+/* Default page size (receipt batch, docket, transfer note). Label/sticker printing override this via an injected style — see print.js. */
 @page{size:A4; margin:16mm;}
-
-/* ---------- QR tag sheet ---------- */
-.tag-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:4mm;}
-.tag{
-  border:1px dashed #8B9A9C; border-radius:2px; padding:3mm 4mm;
-  font-family:-apple-system,sans-serif; color:#1B2429; break-inside:avoid;
-  display:flex; align-items:center; gap:3mm;
-}
-.tag img{width:20mm; height:20mm; flex:none;}
-.tag .t-info{font-size:9px; line-height:1.4;}
-.tag .t-room{font-size:13px; font-weight:700;}
-.tag .t-docket{font-family:"SFMono-Regular",Consolas,monospace; font-size:8px; color:#5B6B70;}
 
 /* ---------- Sticker label ---------- */
 .label{
@@ -381,7 +369,9 @@ tbody tr:hover{background:var(--accent-wash);}
 .receipt{
   width:101.6mm; min-height:152.4mm; box-sizing:border-box; padding:6mm;
   font-family:-apple-system,sans-serif; color:#1B2429;
+  page-break-after:always; break-after:page;
 }
+.receipt:last-child{page-break-after:auto; break-after:auto;}
 .receipt .r-logo{
   text-align:center; font-family:Georgia,serif; font-weight:700; font-size:17px;
   padding-bottom:4mm; border-bottom:2px solid #1B2429; margin-bottom:4mm;

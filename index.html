@@ -83,7 +83,7 @@
       <div id="subtab-upload">
         <div class="panel">
           <h2>Upload the Production Summary workbook</h2>
-          <p class="muted">Same file you already keep — nothing changes about how you fill it in. Each bill row becomes an order and gets a QR tag to print and attach to the bag.</p>
+          <p class="muted">Same file you already keep — nothing changes about how you fill it in. Each bill row becomes an order, and a receipt prints for every bill.</p>
           <input type="file" id="import-file" accept=".xlsx,.xlsm,.xls">
           <div id="import-status"></div>
           <div id="import-preview" class="hidden">
@@ -109,7 +109,7 @@
               </thead>
               <tbody id="import-preview-body"></tbody>
             </table>
-            <button class="btn-primary" id="btn-confirm-import">Import &amp; print QR tags</button>
+            <button class="btn-primary" id="btn-confirm-import">Import &amp; print receipts</button>
           </div>
         </div>
       </div>
@@ -350,11 +350,11 @@
 <!-- PRINT: RECEIPT, ~4x6in (populated by JS, only visible when printing) -->
 <div id="print-receipt" data-print-root>
   <div class="receipt">
-    <div class="r-logo">🧺 LaundroPlus</div>
+    <div class="r-logo">LaundroPlus</div>
     <div class="r-codes">
       <div class="r-code-row"><span>Bill No.</span><b id="r-bill-number"></b></div>
       <div class="r-code-row"><span>Receipt No.</span><b id="r-receipt-number"></b></div>
-      <div class="r-code-row r-unique"><span>Unique Code</span><b id="r-unique-code"></b></div>
+      <div class="r-code-row r-unique"><span>Code</span><b id="r-unique-code"></b></div>
     </div>
     <div class="r-qr"><img id="r-qr-img" alt="QR"></div>
     <div class="r-customer">
@@ -370,9 +370,9 @@
   </div>
 </div>
 
-<!-- PRINT: QR TAG SHEET (one tag per imported bill, to attach before wash) -->
-<div id="print-tags" data-print-root>
-  <div class="tag-grid" id="tag-grid"></div>
+<!-- PRINT: RECEIPTS BATCH, one 4x6in receipt per imported bill -->
+<div id="print-receipts-batch" data-print-root>
+  <div id="receipts-batch-list"></div>
 </div>
 
 <!-- PRINT: STICKER LABEL (printed on scan at pack time) -->
