@@ -176,12 +176,49 @@ document.querySelectorAll(".subtab-btn").forEach((btn) => {
   });
 });
 
+let ordersRawCache = [];
+
 async function refreshOrders() {
-  const orders = await fetchOrders(CUSTOMER_ID);
-  renderOrders(orders);
+  ordersRawCache = await fetchOrders(CUSTOMER_ID);
+  applyOrdersFilter();
+}
+
+function applyOrdersFilter() {
+  const q = document.getElementById("ol-search").value.trim().toLowerCase();
+  const location = document.getElementById("ol-location").value;
+  const from = document.getElementById("ol-from").value;
+  const to = document.getElementById("ol-to").value;
+
+  const filtered = ordersRawCache.filter((o) => {
+    if (location && o.customerName !== location) return false;
+    if (from && (o.orderDate || "") < from) return false;
+    if (to && (o.orderDate || "") > to) return false;
+    if (q) {
+      const haystack = [o.uniqueCode, o.docketNo, o.billNumber, o.roomOrBillNo, o.roomNumber, o.guestName, o.customerName]
+        .filter(Boolean).join(" ").toLowerCase();
+      if (!haystack.includes(q)) return false;
+    }
+    return true;
+  });
+
+  document.getElementById("ol-filter-count").textContent =
+    (q || location || from || to) ? `Showing ${filtered.length} of ${ordersRawCache.length} bills` : `${ordersRawCache.length} bills`;
+
+  renderOrders(filtered);
 }
 
 document.getElementById("btn-refresh-orders").addEventListener("click", refreshOrders);
+document.getElementById("ol-search").addEventListener("input", applyOrdersFilter);
+document.getElementById("ol-location").addEventListener("change", applyOrdersFilter);
+document.getElementById("ol-from").addEventListener("change", applyOrdersFilter);
+document.getElementById("ol-to").addEventListener("change", applyOrdersFilter);
+document.getElementById("btn-ol-clear").addEventListener("click", () => {
+  document.getElementById("ol-search").value = "";
+  document.getElementById("ol-location").value = "";
+  document.getElementById("ol-from").value = "";
+  document.getElementById("ol-to").value = "";
+  applyOrdersFilter();
+});
 
 // ---------- Init customer + build item picker ----------
 async function initCustomerAndUI() {
@@ -695,10 +732,7 @@ async function printLabel(order) {
 }
 
 // ---------- Orders tab: grouped by hotel, then date, expandable ----------
-let ordersCache = [];
-
 function renderOrders(orders) {
-  ordersCache = orders;
   const container = document.getElementById("orders-groups");
   const empty = document.getElementById("orders-empty");
   container.innerHTML = "";
@@ -741,7 +775,7 @@ function renderOrders(orders) {
         </div>
         <div class="date-group-body hidden">
           <table>
-            <thead><tr><th>Docket</th><th>Room / bill no.</th><th>Service</th><th>Pieces</th><th>Total (Rs)</th><th>Status</th></tr></thead>
+            <thead><tr><th>Unique code</th><th>Room / bill no.</th><th>Service</th><th>Pieces</th><th>Total (Rs)</th><th>Status</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
@@ -760,7 +794,7 @@ function renderOrders(orders) {
         const tr = document.createElement("tr");
         tr.className = "bill-row";
         tr.innerHTML = `
-          <td>${o.docketNo || ""}</td>
+          <td>${o.uniqueCode || o.docketNo || ""}</td>
           <td>${o.roomOrBillNo || ""}</td>
           <td>${o.serviceType?.name || ""}</td>
           <td class="num">${o.totalPieces ?? ""}</td>

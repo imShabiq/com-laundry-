@@ -186,7 +186,25 @@
 
     <!-- 2-3. ORDERS: grouped by hotel + date, expandable, click a bill for full detail -->
     <section id="tab-orders" class="hidden">
-      <div style="display:flex; justify-content:flex-end; margin-bottom:10px;">
+      <div class="filter-bar">
+        <div class="field" style="width:220px;">
+          <label for="ol-search">Search</label>
+          <input type="text" id="ol-search" placeholder="Unique code, bill no., room, customer…">
+        </div>
+        <div class="field" style="width:160px;">
+          <label for="ol-location">Location</label>
+          <select id="ol-location"><option value="">All locations</option><option value="Sheraton">Sheraton</option></select>
+        </div>
+        <div class="field" style="width:150px;">
+          <label for="ol-from">From date</label>
+          <input type="date" id="ol-from">
+        </div>
+        <div class="field" style="width:150px;">
+          <label for="ol-to">To date</label>
+          <input type="date" id="ol-to">
+        </div>
+        <button class="btn-ghost" id="btn-ol-clear">Clear</button>
+        <span class="filter-count" id="ol-filter-count"></span>
         <button id="btn-refresh-orders" class="btn-ghost">Refresh</button>
       </div>
       <div id="orders-groups"></div>
