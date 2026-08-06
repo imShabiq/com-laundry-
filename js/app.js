@@ -1,6 +1,7 @@
 import { watchAuth, login, logout } from "./auth.js";
 import {
-  getCustomer, createOrder, createOrders, getOrderByDocketNo, makeDocketNo, fetchOrders, updateOrderStatus,
+  getCustomer, createOrder, createOrders, getOrderByDocketNo, getOrderByUniqueCode, makeDocketNo,
+  generateUniqueCode, generateUniqueCodes, fetchOrders, updateOrderStatus,
   fetchPackedUnassignedOrders, createTransferNote, fetchTransferNotes, fetchOrdersByIds,
 } from "./db.js";
 import { SERVICE_TYPES, statusLabel } from "./constants.js";
@@ -220,10 +221,14 @@ function recalcSummary() {
 // ---------- Save & print ----------
 document.getElementById("btn-save-print").addEventListener("click", async () => {
   const saveMsg = document.getElementById("save-msg");
-  const room = document.getElementById("f-room").value.trim();
+  const billNumber = document.getElementById("f-bill-number").value.trim();
+  const roomNumber = document.getElementById("f-room").value.trim();
+  const guestName = document.getElementById("f-guest-name").value.trim();
+  const customerMobile = document.getElementById("f-mobile").value.trim();
+  const packingMethod = document.getElementById("f-packing-method").value;
   const summary = recalcSummary();
 
-  if (!room) { saveMsg.textContent = "Enter a room / bill number."; saveMsg.className = "err"; return; }
+  if (!billNumber) { saveMsg.textContent = "Enter a bill number."; saveMsg.className = "err"; return; }
   if (summary.lines.length === 0) { saveMsg.textContent = "Tick at least one item."; saveMsg.className = "err"; return; }
 
   const btn = document.getElementById("btn-save-print");
@@ -233,12 +238,20 @@ document.getElementById("btn-save-print").addEventListener("click", async () => 
 
   try {
     const docketNo = makeDocketNo(customer.code || "SH");
+    const { uniqueCode, receiptNumber } = await generateUniqueCode(CUSTOMER_ID);
     const order = {
       customerId: CUSTOMER_ID,
       customerName: customer.name,
       docketNo,
       orderDate: new Date().toISOString().slice(0, 10),
-      roomOrBillNo: room,
+      roomOrBillNo: roomNumber || billNumber,
+      billNumber,
+      roomNumber,
+      guestName,
+      customerMobile,
+      packingMethod,
+      uniqueCode,
+      receiptNumber,
       serviceType: summary.service,
       lines: summary.lines,
       totalPieces: summary.totalPieces,
@@ -248,8 +261,8 @@ document.getElementById("btn-save-print").addEventListener("click", async () => 
       totalBillValue: summary.total,
     };
     await createOrder(order);
-    printDocket(order);
-    saveMsg.textContent = `Saved — docket ${docketNo}`;
+    printReceipt(order);
+    saveMsg.textContent = `Saved — ${uniqueCode}`;
     saveMsg.className = "ok";
     resetForm();
     refreshOrders();
@@ -262,7 +275,10 @@ document.getElementById("btn-save-print").addEventListener("click", async () => 
 });
 
 function resetForm() {
+  document.getElementById("f-bill-number").value = "";
   document.getElementById("f-room").value = "";
+  document.getElementById("f-guest-name").value = "";
+  document.getElementById("f-mobile").value = "";
   document.getElementById("f-pickup").value = "";
   document.querySelectorAll(".item-qty").forEach((el) => {
     el.value = "";
@@ -271,24 +287,26 @@ function resetForm() {
   recalcSummary();
 }
 
-// ---------- Print docket ----------
-function printDocket(order) {
-  document.getElementById("d-ref").innerHTML = `${order.docketNo}<br>${order.orderDate}`;
-  document.getElementById("d-customer").innerHTML = `<b>${order.customerName}</b> · Room ${order.roomOrBillNo}`;
-  document.getElementById("d-service").textContent = order.serviceType.name;
+// ---------- Print receipt (~4x6in) ----------
+async function printReceipt(order) {
+  document.getElementById("r-bill-number").textContent = order.billNumber || order.roomOrBillNo || "—";
+  document.getElementById("r-receipt-number").textContent = order.receiptNumber || "—";
+  document.getElementById("r-unique-code").textContent = order.uniqueCode || "—";
+  document.getElementById("r-customer-name").textContent = order.guestName || "—";
+  document.getElementById("r-room-number").textContent = order.roomNumber || order.roomOrBillNo || "—";
+  document.getElementById("r-packing-method").textContent = order.packingMethod || "Folded";
 
-  const tbody = document.getElementById("d-lines");
+  const tbody = document.getElementById("r-items");
   tbody.innerHTML = "";
   order.lines.forEach((l) => {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${l.item}</td><td style="text-align:right">${l.qty}</td><td style="text-align:right">${l.rate}</td><td style="text-align:right">${l.lineTotal}</td>`;
+    tr.innerHTML = `<td>${l.item}</td><td style="text-align:right">${l.qty}</td>`;
     tbody.appendChild(tr);
   });
+  document.getElementById("r-total-qty").textContent = order.totalPieces;
+  document.getElementById("r-qr-img").src = await qrDataUrl(order.uniqueCode || order.docketNo);
 
-  document.getElementById("d-total-label").textContent = `Total — ${order.totalPieces} pcs`;
-  document.getElementById("d-total-value").textContent = `Rs ${order.totalBillValue}`;
-
-  printElement("print-docket", "size:A4; margin:16mm;");
+  printElement("print-receipt", "size:101.6mm 152.4mm; margin:0;");
 }
 
 // ---------- Import from Excel ----------
@@ -367,9 +385,12 @@ document.getElementById("btn-confirm-import").addEventListener("click", async ()
   const btn = document.getElementById("btn-confirm-import");
   if (visibleImport.length === 0) { status.textContent = "No bills in the current filter to import."; return; }
   btn.disabled = true;
-  status.textContent = "Importing…";
+  status.textContent = `Assigning ${visibleImport.length} unique codes…`;
   try {
-    const created = await createOrders(visibleImport);
+    const codes = await generateUniqueCodes(CUSTOMER_ID, visibleImport.length);
+    const toImport = visibleImport.map((o, i) => ({ ...o, uniqueCode: codes[i].uniqueCode, receiptNumber: codes[i].receiptNumber }));
+    status.textContent = "Importing…";
+    const created = await createOrders(toImport);
     status.textContent = `Imported ${created.length} bills. Preparing QR tags to print…`;
     await printTagSheet(created);
     status.textContent = `Imported and tagged ${created.length} bills. Attach a tag to each bag before wash.`;
@@ -388,7 +409,7 @@ async function printTagSheet(orders) {
   const grid = document.getElementById("tag-grid");
   grid.innerHTML = "";
   for (const o of orders) {
-    const qr = await qrDataUrl(o.docketNo);
+    const qr = await qrDataUrl(o.uniqueCode || o.docketNo);
     const tag = document.createElement("div");
     tag.className = "tag";
     tag.innerHTML = `
@@ -396,7 +417,7 @@ async function printTagSheet(orders) {
       <div class="t-info">
         <div class="t-room">${o.roomOrBillNo}</div>
         <div>${o.orderDate} · ${o.serviceType.name}</div>
-        <div class="t-docket">${o.docketNo}</div>
+        <div class="t-docket">${o.uniqueCode || o.docketNo}</div>
       </div>
     `;
     grid.appendChild(tag);
@@ -408,26 +429,27 @@ async function printTagSheet(orders) {
 const scanInput = document.getElementById("scan-input");
 scanInput.addEventListener("keydown", async (e) => {
   if (e.key !== "Enter") return;
-  const docketNo = scanInput.value.trim();
+  const code = scanInput.value.trim();
   scanInput.value = "";
-  if (!docketNo) return;
-  await handleScan(docketNo);
+  if (!code) return;
+  await handleScan(code);
 });
 
-async function handleScan(docketNo) {
+async function handleScan(code) {
   const status = document.getElementById("scan-status");
   status.textContent = "Looking up…";
   status.className = "";
   try {
-    const order = await getOrderByDocketNo(CUSTOMER_ID, docketNo);
+    // Older-style codes (from before the unique-code system) are still matched by docket number.
+    const order = (await getOrderByUniqueCode(code)) || (await getOrderByDocketNo(CUSTOMER_ID, code));
     if (!order) {
-      status.textContent = `No bill found for "${docketNo}".`;
+      status.textContent = `No bill found for "${code}".`;
       status.className = "err";
       return;
     }
     await printLabel(order);
     await updateOrderStatus(order.id, "packed");
-    status.textContent = `Printed label for Room ${order.roomOrBillNo} (${order.docketNo}) — marked packed.`;
+    status.textContent = `Printed label for Room ${order.roomOrBillNo} (${order.uniqueCode || order.docketNo}) — marked packed.`;
     status.className = "ok";
   } catch (err) {
     status.textContent = "Scan failed — check connection and try again.";
@@ -450,7 +472,7 @@ async function printLabel(order) {
   });
   document.getElementById("lb-total-label").textContent = `${order.totalPieces} pcs`;
   document.getElementById("lb-total-value").textContent = `Rs ${order.totalBillValue}`;
-  document.getElementById("lb-qr").src = await qrDataUrl(order.docketNo);
+  document.getElementById("lb-qr").src = await qrDataUrl(order.uniqueCode || order.docketNo);
 
   printElement("print-label", "size:100mm 130mm; margin:4mm;");
 }
@@ -546,8 +568,13 @@ let modalOrder = null;
 function openBillModal(order) {
   modalOrder = order;
   document.getElementById("bm-title").textContent = `Room / bill ${order.roomOrBillNo}`;
-  document.getElementById("bm-meta").innerHTML =
-    `${order.customerName} · ${order.orderDate} · ${order.serviceType?.name} · <span class="chip ${order.status}">${statusLabel(order.status || "received")}</span> · docket ${order.docketNo}`;
+  const guestBits = [order.guestName, order.customerMobile].filter(Boolean).join(" · ");
+  document.getElementById("bm-meta").innerHTML = `
+    ${order.customerName} · ${order.orderDate} · ${order.serviceType?.name} ·
+    <span class="chip ${order.status}">${statusLabel(order.status || "received")}</span><br>
+    Bill No ${order.billNumber || order.roomOrBillNo} · Unique code ${order.uniqueCode || "—"} · Packing ${order.packingMethod || "—"}
+    ${guestBits ? `<br>${guestBits}` : ""}
+  `;
 
   const tbody = document.getElementById("bm-lines");
   tbody.innerHTML = "";
@@ -568,7 +595,7 @@ function openBillModal(order) {
 
 document.getElementById("bm-close").addEventListener("click", () => billModal.classList.add("hidden"));
 billModal.addEventListener("click", (e) => { if (e.target === billModal) billModal.classList.add("hidden"); });
-document.getElementById("bm-print-docket").addEventListener("click", () => modalOrder && printDocket(modalOrder));
+document.getElementById("bm-print-receipt").addEventListener("click", () => modalOrder && printReceipt(modalOrder));
 document.getElementById("bm-print-label").addEventListener("click", () => modalOrder && printLabel(modalOrder));
 
 // ---------- Transactions: Transfer Note ----------

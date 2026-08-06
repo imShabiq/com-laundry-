@@ -89,16 +89,39 @@
         <div class="order-layout">
           <div>
             <div class="panel">
-              <h2>Order details</h2>
+              <h2>Bill details</h2>
               <div class="field-row">
                 <div class="field">
-                  <label for="f-customer">Customer</label>
+                  <label for="f-customer">Location / hotel</label>
                   <select id="f-customer"><option value="sheraton">Sheraton</option></select>
                 </div>
                 <div class="field">
-                  <label for="f-room">Room / bill number</label>
-                  <input type="text" id="f-room" placeholder="e.g. 1602 or guest name">
+                  <label for="f-bill-number">Bill number</label>
+                  <input type="text" id="f-bill-number" placeholder="e.g. 1602">
                 </div>
+                <div class="field">
+                  <label for="f-room">Room number (optional)</label>
+                  <input type="text" id="f-room" placeholder="e.g. 1602">
+                </div>
+              </div>
+              <div class="field-row">
+                <div class="field">
+                  <label for="f-guest-name">Customer name (optional)</label>
+                  <input type="text" id="f-guest-name" placeholder="Guest / customer name">
+                </div>
+                <div class="field">
+                  <label for="f-mobile">Customer mobile (optional)</label>
+                  <input type="text" id="f-mobile" placeholder="07X XXX XXXX">
+                </div>
+                <div class="field">
+                  <label for="f-packing-method">Packing method</label>
+                  <select id="f-packing-method">
+                    <option value="Folded">Folded</option>
+                    <option value="Hanger">Hanger</option>
+                  </select>
+                </div>
+              </div>
+              <div class="field-row">
                 <div class="field">
                   <label for="f-service">Service type</label>
                   <select id="f-service"></select>
@@ -124,7 +147,7 @@
               <div class="summary-line"><span class="k">Service surcharge</span><span id="s-surcharge">Rs 0</span></div>
               <div class="summary-line"><span class="k">Pickup / delivery</span><span id="s-pickup">Rs 0</span></div>
               <div class="summary-line total"><span class="k">Total bill value</span><span id="s-total">Rs 0</span></div>
-              <button class="btn-primary" id="btn-save-print">Save &amp; print docket</button>
+              <button class="btn-primary" id="btn-save-print">Save &amp; print receipt</button>
               <div id="save-msg"></div>
             </div>
           </div>
@@ -209,29 +232,32 @@
     </div>
     <div class="modal-totals" id="bm-totals"></div>
     <div class="modal-actions">
-      <button id="bm-print-docket" class="btn-ghost">Reprint docket</button>
+      <button id="bm-print-receipt" class="btn-ghost">Reprint receipt</button>
       <button id="bm-print-label" class="btn-ghost">Reprint label</button>
     </div>
   </div>
 </div>
 
-<!-- PRINT: DOCKET (populated by JS, only visible when printing) -->
-<div id="print-docket" data-print-root>
-  <div class="docket">
-    <div class="d-head">
-      <div class="d-brand">LaundroPlus<small>Guest Laundry — Packing Docket</small></div>
-      <div class="d-ref" id="d-ref"></div>
+<!-- PRINT: RECEIPT, ~4x6in (populated by JS, only visible when printing) -->
+<div id="print-receipt" data-print-root>
+  <div class="receipt">
+    <div class="r-logo">🧺 LaundroPlus</div>
+    <div class="r-codes">
+      <div class="r-code-row"><span>Bill No.</span><b id="r-bill-number"></b></div>
+      <div class="r-code-row"><span>Receipt No.</span><b id="r-receipt-number"></b></div>
+      <div class="r-code-row r-unique"><span>Unique Code</span><b id="r-unique-code"></b></div>
     </div>
-    <div class="d-meta">
-      <span id="d-customer"></span>
-      <span id="d-service"></span>
+    <div class="r-qr"><img id="r-qr-img" alt="QR"></div>
+    <div class="r-customer">
+      <div><span>Customer</span><b id="r-customer-name">—</b></div>
+      <div><span>Room No.</span><b id="r-room-number">—</b></div>
+      <div><span>Packing</span><b id="r-packing-method"></b></div>
     </div>
     <table>
-      <thead><tr><th>Item</th><th style="text-align:right">Qty</th><th style="text-align:right">Rate</th><th style="text-align:right">Amount</th></tr></thead>
-      <tbody id="d-lines"></tbody>
+      <thead><tr><th>Item</th><th style="text-align:right">Qty</th></tr></thead>
+      <tbody id="r-items"></tbody>
     </table>
-    <div class="d-total"><span id="d-total-label">Total</span><span id="d-total-value"></span></div>
-    <div class="d-foot"><span>Packed by: ______________</span><span>Checked by: ______________</span></div>
+    <div class="r-total"><span>TOTAL QTY</span><b id="r-total-qty"></b></div>
   </div>
 </div>
 

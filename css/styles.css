@@ -265,7 +265,7 @@ tbody tr:hover{background:var(--accent-wash);}
 #scan-status.err{color:var(--red);}
 
 /* ---------- Print docket / tags / label ---------- */
-#print-docket, #print-tags, #print-label, #print-transfer{display:none;}
+#print-receipt, #print-tags, #print-label, #print-transfer{display:none;}
 @media print{
   body > *:not([data-print-root]){display:none !important;}
   [data-print-root].show{display:block !important;}
@@ -307,3 +307,36 @@ tbody tr:hover{background:var(--accent-wash);}
 .docket td{font-family:-apple-system,sans-serif; font-size:13px; padding:5px 0; border-bottom:1px dotted #DCE3E1;}
 .docket .d-total{display:flex; justify-content:space-between; font-family:-apple-system,sans-serif; font-weight:700; font-size:15px; padding-top:8px; border-top:1px solid #1B2429;}
 .docket .d-foot{display:flex; justify-content:space-between; font-family:-apple-system,sans-serif; font-size:11px; color:#8B9A9C; margin-top:40px;}
+
+/* ---------- Receipt, ~4x6in ---------- */
+.receipt{
+  width:101.6mm; min-height:152.4mm; box-sizing:border-box; padding:6mm;
+  font-family:-apple-system,sans-serif; color:#1B2429;
+}
+.receipt .r-logo{
+  text-align:center; font-family:Georgia,serif; font-weight:700; font-size:17px;
+  padding-bottom:4mm; border-bottom:2px solid #1B2429; margin-bottom:4mm;
+}
+.receipt .r-codes{margin-bottom:3mm;}
+.receipt .r-code-row{display:flex; justify-content:space-between; font-size:12px; padding:1.5mm 0;}
+.receipt .r-code-row span{color:#5B6B70;}
+.receipt .r-code-row b{font-family:"SFMono-Regular",Consolas,monospace;}
+.receipt .r-code-row.r-unique{
+  background:#F7FAF9; border:1px dashed #1B2429; border-radius:2mm; padding:2mm 3mm; margin-top:1mm;
+}
+.receipt .r-code-row.r-unique b{font-size:16px; letter-spacing:.03em;}
+.receipt .r-qr{display:flex; justify-content:center; margin:4mm 0;}
+.receipt .r-qr img{width:32mm; height:32mm;}
+.receipt .r-customer{
+  border-top:1px solid #1B2429; border-bottom:1px solid #1B2429; padding:3mm 0; margin-bottom:3mm;
+}
+.receipt .r-customer div{display:flex; justify-content:space-between; font-size:13px; padding:1mm 0;}
+.receipt .r-customer span{color:#5B6B70;}
+.receipt .r-customer b{font-size:14px;}
+.receipt table{width:100%; border-collapse:collapse; margin-bottom:3mm;}
+.receipt th{text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.04em; color:#5B6B70; border-bottom:1px solid #1B2429; padding:1.5mm 0;}
+.receipt td{font-size:14px; padding:1.8mm 0; border-bottom:1px dotted #DCE3E1;}
+.receipt .r-total{
+  display:flex; justify-content:space-between; align-items:center;
+  font-weight:700; font-size:18px; padding-top:3mm; border-top:2px solid #1B2429; margin-top:2mm;
+}

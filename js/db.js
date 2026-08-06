@@ -46,6 +46,19 @@ export function makeDocketNo(code) {
   return `${code}-${stamp}`;
 }
 
+export async function generateUniqueCode(customerId) {
+  const { data, error } = await supabase.rpc("next_unique_code", { p_customer_id: customerId });
+  if (error) throw error;
+  return { uniqueCode: data, receiptNumber: data.replace(/^\D+/, "") };
+}
+
+export async function generateUniqueCodes(customerId, count) {
+  if (count === 0) return [];
+  const { data, error } = await supabase.rpc("next_unique_codes", { p_customer_id: customerId, p_count: count });
+  if (error) throw error;
+  return data.map((code) => ({ uniqueCode: code, receiptNumber: code.replace(/^\D+/, "") }));
+}
+
 function orderToRow(order) {
   return {
     customer_id: order.customerId,
@@ -61,6 +74,13 @@ function orderToRow(order) {
     pickup_fee: order.pickupFee,
     total_bill_value: order.totalBillValue,
     status: "received",
+    bill_number: order.billNumber,
+    guest_name: order.guestName,
+    customer_mobile: order.customerMobile,
+    room_number: order.roomNumber,
+    packing_method: order.packingMethod,
+    unique_code: order.uniqueCode,
+    receipt_number: order.receiptNumber,
   };
 }
 
@@ -83,6 +103,12 @@ export async function getOrderByDocketNo(customerId, docketNo) {
     .eq("customer_id", customerId)
     .eq("docket_no", docketNo)
     .maybeSingle();
+  if (error) throw error;
+  return data ? rowToOrder(data) : null;
+}
+
+export async function getOrderByUniqueCode(uniqueCode) {
+  const { data, error } = await supabase.from("orders").select("*").eq("unique_code", uniqueCode).maybeSingle();
   if (error) throw error;
   return data ? rowToOrder(data) : null;
 }
@@ -114,6 +140,16 @@ function rowToOrder(row) {
     pickupFee: row.pickup_fee,
     totalBillValue: row.total_bill_value,
     status: row.status,
+    billNumber: row.bill_number,
+    guestName: row.guest_name,
+    customerMobile: row.customer_mobile,
+    roomNumber: row.room_number,
+    packingMethod: row.packing_method,
+    uniqueCode: row.unique_code,
+    receiptNumber: row.receipt_number,
+    packetCount: row.packet_count,
+    packedBy: row.packed_by,
+    packedAt: row.packed_at,
   };
 }
 

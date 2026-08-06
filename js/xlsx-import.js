@@ -102,12 +102,20 @@ export async function parseProductionSummary(file, customer) {
     const orderDate = toDateStr(row[COL_DATE]);
 
     seq += 1;
+    const roomOrBillNo = String(room ?? "").trim() || "(unspecified)";
     orders.push({
       customerId: customer.id,
       customerName: customer.name,
       docketNo: `${code}-${orderDate.replace(/-/g, "")}-${String(seq).padStart(4, "0")}`,
       orderDate,
-      roomOrBillNo: String(room ?? "").trim() || "(unspecified)",
+      roomOrBillNo,
+      // The source sheet has one combined "Room Number/Bill number" column - hotel guest
+      // bills don't distinguish these, so both fields take the same value.
+      billNumber: roomOrBillNo,
+      roomNumber: roomOrBillNo,
+      guestName: "",
+      customerMobile: "",
+      packingMethod: "Folded",
       serviceType: service,
       lines,
       totalPieces,
