@@ -34,7 +34,15 @@
   </header>
 
   <nav class="tabs">
-    <button class="tab-btn active" data-tab="entry">Collection</button>
+    <div class="tab-dropdown">
+      <button class="tab-btn active" id="collection-tab-btn" data-tab="entry" aria-haspopup="true" aria-expanded="false">
+        Collection <span class="caret">▾</span>
+      </button>
+      <div class="tab-dropdown-menu hidden" id="collection-dropdown-menu">
+        <button class="tab-dropdown-item" data-subtab="upload">Upload</button>
+        <button class="tab-dropdown-item" data-subtab="manual">Enter bill</button>
+      </div>
+    </div>
     <button class="tab-btn" data-tab="orders">Order List</button>
     <button class="tab-btn" data-tab="transactions">Transactions</button>
   </nav>
@@ -42,12 +50,6 @@
   <main>
     <!-- COLLECTION -->
     <section id="tab-entry">
-      <div class="section-select-row">
-        <select id="entry-mode-select" class="section-select">
-          <option value="upload">Upload</option>
-          <option value="manual">Enter bill</option>
-        </select>
-      </div>
 
       <div id="subtab-upload">
         <div class="panel">

@@ -44,25 +44,55 @@ watchAuth(async (user) => {
 });
 
 // ---------- Tabs ----------
+function activateTab(tabName) {
+  document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+  document.querySelector(`.tab-btn[data-tab="${tabName}"]`).classList.add("active");
+  document.querySelectorAll("main > section").forEach((s) => s.classList.add("hidden"));
+  document.getElementById(`tab-${tabName}`).classList.remove("hidden");
+  if (tabName === "orders") refreshOrders();
+  if (tabName === "transactions") {
+    const activeSub = document.querySelector('.subtab-btn[data-parent="transactions"].active')?.dataset.subtab;
+    if (activeSub === "packing") document.getElementById("scan-input").focus();
+    if (activeSub === "transfer") refreshTransferTab();
+  }
+}
+
 document.querySelectorAll(".tab-btn").forEach((btn) => {
+  if (btn.id === "collection-tab-btn") return; // handled by the dropdown below
   btn.addEventListener("click", () => {
-    document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
-    btn.classList.add("active");
-    document.querySelectorAll("main > section").forEach((s) => s.classList.add("hidden"));
-    document.getElementById(`tab-${btn.dataset.tab}`).classList.remove("hidden");
-    if (btn.dataset.tab === "orders") refreshOrders();
-    if (btn.dataset.tab === "transactions") {
-      const activeSub = document.querySelector('.subtab-btn[data-parent="transactions"].active')?.dataset.subtab;
-      if (activeSub === "packing") document.getElementById("scan-input").focus();
-      if (activeSub === "transfer") refreshTransferTab();
-    }
+    closeCollectionMenu();
+    activateTab(btn.dataset.tab);
   });
 });
 
-// ---------- Collection: Upload / Enter bill dropdown ----------
-document.getElementById("entry-mode-select").addEventListener("change", (e) => {
-  document.querySelectorAll(`#tab-entry > [id^="subtab-"]`).forEach((s) => s.classList.add("hidden"));
-  document.getElementById(`subtab-${e.target.value}`).classList.remove("hidden");
+// ---------- Collection: dropdown to pick Upload / Enter bill ----------
+const collectionBtn = document.getElementById("collection-tab-btn");
+const collectionMenu = document.getElementById("collection-dropdown-menu");
+
+function closeCollectionMenu() {
+  collectionMenu.classList.add("hidden");
+  collectionBtn.setAttribute("aria-expanded", "false");
+}
+
+collectionBtn.addEventListener("click", (e) => {
+  e.stopPropagation();
+  const isOpen = !collectionMenu.classList.contains("hidden");
+  if (isOpen) { closeCollectionMenu(); return; }
+  collectionMenu.classList.remove("hidden");
+  collectionBtn.setAttribute("aria-expanded", "true");
+});
+
+document.querySelectorAll(".tab-dropdown-item").forEach((item) => {
+  item.addEventListener("click", () => {
+    activateTab("entry");
+    document.querySelectorAll(`#tab-entry > [id^="subtab-"]`).forEach((s) => s.classList.add("hidden"));
+    document.getElementById(`subtab-${item.dataset.subtab}`).classList.remove("hidden");
+    closeCollectionMenu();
+  });
+});
+
+document.addEventListener("click", (e) => {
+  if (!e.target.closest(".tab-dropdown")) closeCollectionMenu();
 });
 
 // ---------- Sub-tabs ----------
