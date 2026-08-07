@@ -56,6 +56,7 @@ function doPost(e) {
     const handlers = {
       ensureCustomerSeeded: () => ensureCustomerSeeded_(params),
       getCustomer: () => getCustomer_(params.customerId),
+      fetchCustomers: () => fetchCustomers_(),
       generateUniqueCode: () => generateUniqueCode_(params.customerId),
       generateUniqueCodes: () => generateUniqueCodes_(params.customerId, params.count),
       createOrder: () => createOrder_(params.order, ctx),
@@ -255,6 +256,10 @@ function getUserRole_(email) {
 }
 
 // ---------- Customers ----------
+
+function fetchCustomers_() {
+  return readAll_(getSheet_("Customers", CUSTOMER_HEADERS)).map((row) => ({ id: row.id, name: row.name, code: row.code }));
+}
 
 function getCustomer_(customerId) {
   const row = readAll_(getSheet_("Customers", CUSTOMER_HEADERS)).find((r) => r.id === customerId);

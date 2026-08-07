@@ -8,6 +8,10 @@ export async function getCustomer(customerId) {
   return call("getCustomer", { customerId });
 }
 
+export async function fetchCustomers() {
+  return call("fetchCustomers", {});
+}
+
 export function makeDocketNo(code) {
   const now = new Date();
   const pad = (n) => String(n).padStart(2, "0");

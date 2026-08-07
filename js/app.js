@@ -1,6 +1,6 @@
 import { watchAuth, login, logout } from "./auth.js";
 import {
-  getCustomer, createOrder, createOrders, getOrderByDocketNo, getOrderByUniqueCode, makeDocketNo,
+  getCustomer, fetchCustomers, ensureCustomerSeeded, createOrder, createOrders, getOrderByDocketNo, getOrderByUniqueCode, makeDocketNo,
   generateUniqueCode, generateUniqueCodes, fetchOrders, updateOrderStatus, savePacking,
   fetchPackedUnassignedOrders, createTransferNote, fetchTransferNotes, fetchOrdersByIds,
   fetchWorkflowStages, fetchStatusHistory, changeOrderStatus, logStatusHistory, searchOrders,
@@ -11,7 +11,7 @@ import { parseProductionSummary } from "./xlsx-import.js";
 import { qrDataUrl } from "./qr.js";
 import { printElement } from "./print.js";
 
-const CUSTOMER_ID = "sheraton";
+let CUSTOMER_ID = localStorage.getItem("lp_active_customer") || "sheraton";
 let customer = null;
 let currentUserEmail = "";
 let workflowStages = [];
@@ -191,7 +191,7 @@ collectionBtn.addEventListener("click", (e) => {
   collectionBtn.setAttribute("aria-expanded", "true");
 });
 
-document.querySelectorAll(".tab-dropdown-item").forEach((item) => {
+document.querySelectorAll("#collection-dropdown-menu .tab-dropdown-item").forEach((item) => {
   item.addEventListener("click", () => {
     activateTab("entry");
     document.querySelectorAll(`#tab-entry > [id^="subtab-"]`).forEach((s) => s.classList.add("hidden"));
@@ -201,7 +201,111 @@ document.querySelectorAll(".tab-dropdown-item").forEach((item) => {
 });
 
 document.addEventListener("click", (e) => {
-  if (!e.target.closest(".tab-dropdown")) closeCollectionMenu();
+  if (!e.target.closest("#location-switcher")) closeCollectionMenu();
+});
+
+// ---------- Location switcher ----------
+let allCustomers = [];
+
+const locationBtn = document.getElementById("location-btn");
+const locationMenu = document.getElementById("location-menu");
+
+function closeLocationMenu() {
+  locationMenu.classList.add("hidden");
+  locationBtn.setAttribute("aria-expanded", "false");
+}
+
+locationBtn.addEventListener("click", (e) => {
+  e.stopPropagation();
+  const isOpen = !locationMenu.classList.contains("hidden");
+  if (isOpen) { closeLocationMenu(); return; }
+  locationMenu.classList.remove("hidden");
+  locationBtn.setAttribute("aria-expanded", "true");
+});
+
+document.addEventListener("click", (e) => {
+  if (!e.target.closest("#location-switcher")) closeLocationMenu();
+});
+
+async function loadCustomersList() {
+  allCustomers = await fetchCustomers();
+  if (allCustomers.length && !allCustomers.find((c) => c.id === CUSTOMER_ID)) {
+    CUSTOMER_ID = allCustomers[0].id;
+  }
+  renderLocationMenu();
+}
+
+function renderLocationMenu() {
+  const list = document.getElementById("location-menu-list");
+  list.innerHTML = "";
+  allCustomers.forEach((c) => {
+    const btn = document.createElement("button");
+    btn.className = "tab-dropdown-item";
+    btn.textContent = c.name;
+    if (c.id === CUSTOMER_ID) btn.style.color = "var(--accent-strong)";
+    btn.addEventListener("click", () => switchLocation(c.id));
+    list.appendChild(btn);
+  });
+  updateLocationLabels();
+}
+
+function updateLocationLabels() {
+  const current = allCustomers.find((c) => c.id === CUSTOMER_ID);
+  const name = current ? current.name : "Select location";
+  ["location-btn-label", "f-location-label", "tn-location-label", "upload-location-label"].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = id === "location-btn-label" ? name : `— ${name}`;
+  });
+}
+
+async function switchLocation(id) {
+  closeLocationMenu();
+  if (id === CUSTOMER_ID) return;
+  CUSTOMER_ID = id;
+  localStorage.setItem("lp_active_customer", id);
+  renderLocationMenu();
+  showToast(`Switched to ${allCustomers.find((c) => c.id === id)?.name || id}`, "info");
+  await initCustomerAndUI();
+}
+
+document.getElementById("btn-add-location").addEventListener("click", () => {
+  closeLocationMenu();
+  document.getElementById("new-loc-name").value = "";
+  document.getElementById("new-loc-code").value = "";
+  document.getElementById("add-location-msg").textContent = "";
+  document.getElementById("add-location-modal").classList.remove("hidden");
+});
+
+document.getElementById("add-location-cancel").addEventListener("click", () => {
+  document.getElementById("add-location-modal").classList.add("hidden");
+});
+
+document.getElementById("add-location-save").addEventListener("click", async () => {
+  const msg = document.getElementById("add-location-msg");
+  const name = document.getElementById("new-loc-name").value.trim();
+  const code = document.getElementById("new-loc-code").value.trim().toUpperCase();
+  if (!name) { msg.textContent = "Enter a location name."; msg.className = "err"; return; }
+  if (!code) { msg.textContent = "Enter a short code."; msg.className = "err"; return; }
+
+  const id = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || code.toLowerCase();
+  if (allCustomers.find((c) => c.id === id)) { msg.textContent = "A location with that name already exists."; msg.className = "err"; return; }
+
+  const btn = document.getElementById("add-location-save");
+  btn.disabled = true;
+  msg.textContent = "Adding…";
+  msg.className = "";
+  try {
+    await ensureCustomerSeeded(id, { name, code, billingAddress: "", vatRegNo: "", catalog: [] });
+    document.getElementById("add-location-modal").classList.add("hidden");
+    showToast(`Added location "${name}"`, "success");
+    await loadCustomersList();
+    await switchLocation(id);
+  } catch (err) {
+    msg.textContent = "Could not add location — check connection and try again.";
+    msg.className = "err";
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 // ---------- Sub-tabs ----------
@@ -226,12 +330,10 @@ async function refreshOrders() {
 
 function applyOrdersFilter() {
   const q = document.getElementById("ol-search").value.trim().toLowerCase();
-  const location = document.getElementById("ol-location").value;
   const from = document.getElementById("ol-from").value;
   const to = document.getElementById("ol-to").value;
 
   const filtered = ordersRawCache.filter((o) => {
-    if (location && o.customerName !== location) return false;
     if (from && (o.orderDate || "") < from) return false;
     if (to && (o.orderDate || "") > to) return false;
     if (q) {
@@ -243,19 +345,17 @@ function applyOrdersFilter() {
   });
 
   document.getElementById("ol-filter-count").textContent =
-    (q || location || from || to) ? `Showing ${filtered.length} of ${ordersRawCache.length} bills` : `${ordersRawCache.length} bills`;
+    (q || from || to) ? `Showing ${filtered.length} of ${ordersRawCache.length} bills` : `${ordersRawCache.length} bills`;
 
   renderOrders(filtered);
 }
 
 document.getElementById("btn-refresh-orders").addEventListener("click", refreshOrders);
 document.getElementById("ol-search").addEventListener("input", applyOrdersFilter);
-document.getElementById("ol-location").addEventListener("change", applyOrdersFilter);
 document.getElementById("ol-from").addEventListener("change", applyOrdersFilter);
 document.getElementById("ol-to").addEventListener("change", applyOrdersFilter);
 document.getElementById("btn-ol-clear").addEventListener("click", () => {
   document.getElementById("ol-search").value = "";
-  document.getElementById("ol-location").value = "";
   document.getElementById("ol-from").value = "";
   document.getElementById("ol-to").value = "";
   applyOrdersFilter();
@@ -263,12 +363,14 @@ document.getElementById("btn-ol-clear").addEventListener("click", () => {
 
 // ---------- Init customer + build item picker ----------
 async function initCustomerAndUI() {
+  await loadCustomersList();
   customer = await getCustomer(CUSTOMER_ID);
-  if (!customer || !customer.catalog?.length) {
+  if (!customer) {
     document.querySelector("main").innerHTML =
-      '<div class="empty-state">Sheraton catalog isn\'t loaded yet. Run <code>seed.html</code> once from your own machine, then reload this page.</div>';
+      '<div class="empty-state">No location set up yet. Add one from the location switcher (top left, next to the logo).</div>';
     return;
   }
+  updateLocationLabels();
 
   const serviceSelect = document.getElementById("f-service");
   serviceSelect.innerHTML = "";
@@ -279,8 +381,12 @@ async function initCustomerAndUI() {
     serviceSelect.appendChild(opt);
   });
 
-  buildItemPicker(customer.catalog);
-  wireSummaryRecalc();
+  if (customer.catalog && customer.catalog.length) {
+    buildItemPicker(customer.catalog);
+  } else {
+    document.getElementById("item-picker").innerHTML =
+      '<div class="empty-state">No item catalog set up for this location yet — use Upload instead, or contact support to add items for manual entry.</div>';
+  }
   recalcSummary();
   workflowStages = await fetchWorkflowStages();
   const statusSelect = document.getElementById("bm-status-select");
@@ -397,6 +503,7 @@ function wireSummaryRecalc() {
   document.getElementById("f-service").addEventListener("change", recalcSummary);
   document.getElementById("f-pickup").addEventListener("input", recalcSummary);
 }
+wireSummaryRecalc(); // one-time bind - #item-picker uses event delegation, so this survives location switches rebuilding its contents
 
 function currentLines() {
   return Array.from(document.querySelectorAll(".item-qty"))
@@ -1020,11 +1127,11 @@ document.getElementById("btn-create-transfer").addEventListener("click", async (
   const destinationOutlet = document.getElementById("tn-destination").value.trim();
 
   if (chosen.length === 0) { msg.textContent = "Tick at least one bill."; msg.className = "err"; return; }
-  if (!driverName) { msg.textContent = "Enter a driver name."; msg.className = "err"; return; }
 
   const totalPackets = chosen.reduce((s, o) => s + (o.packetCount || 0), 0);
+  const withWho = driverName ? ` with ${driverName}` : "";
   const ok = await confirmDialog(
-    `Dispatch ${chosen.length} bill${chosen.length === 1 ? "" : "s"} (${totalPackets} packets) with ${driverName}${destinationOutlet ? ` to ${destinationOutlet}` : ""}? This marks them all as Dispatched.`,
+    `Dispatch ${chosen.length} bill${chosen.length === 1 ? "" : "s"} (${totalPackets} packets)${withWho}${destinationOutlet ? ` to ${destinationOutlet}` : ""}? This marks them all as Dispatched.`,
     { title: "Create Dispatch", confirmLabel: "Create Dispatch" }
   );
   if (!ok) return;

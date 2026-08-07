@@ -27,6 +27,16 @@
 <div id="view-app" class="hidden">
   <header class="topbar">
     <div class="brand"><h1>LaundroPlus</h1><span>Bill &amp; Pack</span></div>
+    <div class="tab-dropdown" id="location-switcher">
+      <button class="location-btn" id="location-btn" aria-haspopup="true" aria-expanded="false">
+        <span id="location-btn-label">—</span> <span class="caret">▾</span>
+      </button>
+      <div class="tab-dropdown-menu hidden" id="location-menu">
+        <div id="location-menu-list"></div>
+        <div class="location-menu-divider"></div>
+        <button class="tab-dropdown-item" id="btn-add-location">+ Add new location</button>
+      </div>
+    </div>
     <div class="topbar-search">
       <input type="text" id="global-search" placeholder="Search or scan a receipt, bill no., room, customer, phone…" autocomplete="off">
       <div class="search-results hidden" id="search-results"></div>
@@ -82,7 +92,7 @@
 
       <div id="subtab-upload">
         <div class="panel">
-          <h2>Upload the Production Summary workbook</h2>
+          <h2>Upload the Production Summary workbook <span class="loc-context" id="upload-location-label"></span></h2>
           <p class="muted">Same file you already keep — nothing changes about how you fill it in. Each bill row becomes an order, and a receipt prints for every bill.</p>
           <input type="file" id="import-file" accept=".xlsx,.xlsm,.xls">
           <div id="import-status"></div>
@@ -118,12 +128,8 @@
         <div class="order-layout">
           <div>
             <div class="panel">
-              <h2>Bill details</h2>
+              <h2>Bill details <span class="loc-context" id="f-location-label"></span></h2>
               <div class="field-row">
-                <div class="field">
-                  <label for="f-customer">Location / hotel</label>
-                  <select id="f-customer"><option value="sheraton">Sheraton</option></select>
-                </div>
                 <div class="field">
                   <label for="f-bill-number">Bill number</label>
                   <input type="text" id="f-bill-number" placeholder="e.g. 1602">
@@ -191,10 +197,6 @@
           <label for="ol-search">Search</label>
           <input type="text" id="ol-search" placeholder="Unique code, bill no., room, customer…">
         </div>
-        <div class="field" style="width:160px;">
-          <label for="ol-location">Location</label>
-          <select id="ol-location"><option value="">All locations</option><option value="Sheraton">Sheraton</option></select>
-        </div>
         <div class="field" style="width:150px;">
           <label for="ol-from">From date</label>
           <input type="date" id="ol-from">
@@ -248,17 +250,13 @@
 
       <div id="subtab-dispatch" class="hidden">
         <div class="panel">
-          <h2>Packed bills ready for dispatch</h2>
+          <h2>Packed bills ready for dispatch <span class="loc-context" id="tn-location-label"></span></h2>
           <p class="muted">Select the bills going out on this run, fill in the delivery details, then Create Dispatch — it generates the printed Transfer Note the driver carries.</p>
 
           <div class="filter-bar">
-            <div class="field" style="width:220px;">
+            <div class="field" style="width:260px;">
               <label for="tn-search">Search</label>
               <input type="text" id="tn-search" placeholder="Receipt, bill no., room, customer…">
-            </div>
-            <div class="field" style="width:170px;">
-              <label for="tn-customer">Location / hotel</label>
-              <select id="tn-customer"><option value="sheraton">Sheraton</option></select>
             </div>
             <span class="filter-count" id="tn-filter-count"></span>
           </div>
@@ -279,7 +277,7 @@
 
           <div class="field-row" style="margin-top:20px;">
             <div class="field">
-              <label for="tn-driver">Driver name</label>
+              <label for="tn-driver">Driver name (optional)</label>
               <input type="text" id="tn-driver" placeholder="e.g. Kamal Perera">
             </div>
             <div class="field">
@@ -411,6 +409,27 @@
     <div class="modal-actions">
       <button class="btn-ghost" id="confirm-cancel">Cancel</button>
       <button class="btn-primary" id="confirm-ok" style="width:auto; margin-top:0;">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD LOCATION -->
+<div id="add-location-modal" class="modal hidden">
+  <div class="modal-card" style="max-width:360px;">
+    <div class="modal-head"><h2>Add a location</h2></div>
+    <p class="muted">Each location (hotel/outlet) keeps its own bills and its own bill-number sequence.</p>
+    <div class="field">
+      <label for="new-loc-name">Location name</label>
+      <input type="text" id="new-loc-name" placeholder="e.g. Gall Face Hotel">
+    </div>
+    <div class="field">
+      <label for="new-loc-code">Short code (used in bill numbers)</label>
+      <input type="text" id="new-loc-code" placeholder="e.g. GF" maxlength="4" style="text-transform:uppercase;">
+    </div>
+    <div id="add-location-msg"></div>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="add-location-cancel">Cancel</button>
+      <button class="btn-primary" id="add-location-save" style="width:auto; margin-top:0;">Add location</button>
     </div>
   </div>
 </div>
