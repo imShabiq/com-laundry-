@@ -227,8 +227,6 @@ td.num{font-family:"SFMono-Regular",Consolas,monospace; font-variant-numeric:tab
 tbody tr{transition:background-color .12s ease; border-radius:8px;}
 tbody tr:nth-child(even){background:var(--panel-2);}
 tbody tr:hover{background:var(--accent-wash);}
-tbody tr.dup-row{opacity:.55;}
-tbody tr.dup-row:hover{opacity:1;}
 
 .chip{display:inline-flex; align-items:center; gap:5px; font-size:11px; padding:3px 9px; border-radius:5px; font-weight:600;}
 .chip.received{background:var(--amber-wash); color:var(--amber);}
