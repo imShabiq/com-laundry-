@@ -503,6 +503,11 @@ async function printReceipt(order) {
 let pendingImport = [];
 let visibleImport = [];
 let importSortDir = "asc";
+let existingBillKeys = new Set();
+
+function billKey(o) {
+  return `${o.roomOrBillNo}||${o.orderDate}`;
+}
 
 document.getElementById("import-file").addEventListener("change", async (e) => {
   const file = e.target.files[0];
@@ -519,6 +524,11 @@ document.getElementById("import-file").addEventListener("change", async (e) => {
       status.textContent = warnings.join(" ");
       return;
     }
+
+    status.textContent = "Checking for bills already in the system…";
+    const existing = await fetchAllOrdersForDashboard(CUSTOMER_ID);
+    existingBillKeys = new Set(existing.map(billKey));
+
     status.textContent = `Read "${sheetName}" — found ${orders.length} bill${orders.length === 1 ? "" : "s"}. Review below, then import.`;
 
     const dates = orders.map((o) => o.orderDate).sort();
@@ -543,17 +553,26 @@ function renderImportPreview() {
 
   visibleImport = pendingImport
     .filter((o) => (!from || o.orderDate >= from) && (!to || o.orderDate <= to))
-    .sort((a, b) => (a.orderDate < b.orderDate ? -1 : a.orderDate > b.orderDate ? 1 : 0) * (importSortDir === "asc" ? 1 : -1));
+    .sort((a, b) => (a.orderDate < b.orderDate ? -1 : a.orderDate > b.orderDate ? 1 : 0) * (importSortDir === "asc" ? 1 : -1))
+    .map((o) => ({ ...o, isDuplicate: existingBillKeys.has(billKey(o)) }));
+
+  const dupCount = visibleImport.filter((o) => o.isDuplicate).length;
+  const newCount = visibleImport.length - dupCount;
 
   document.getElementById("import-sort-icon").textContent = importSortDir === "asc" ? "↓" : "↑";
-  document.getElementById("import-filter-count").textContent =
-    from || to ? `Showing ${visibleImport.length} of ${pendingImport.length} bills` : `${pendingImport.length} bills`;
+  document.getElementById("import-filter-count").textContent = dupCount > 0
+    ? `${newCount} new, ${dupCount} already in the system (will be skipped)`
+    : `${visibleImport.length} bill${visibleImport.length === 1 ? "" : "s"}, all new`;
 
   const tbody = document.getElementById("import-preview-body");
   tbody.innerHTML = "";
   visibleImport.forEach((o) => {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${o.docketNo}</td><td>${o.orderDate}</td><td>${o.roomOrBillNo}</td><td>${o.serviceType.name}</td><td class="num">${o.totalPieces}</td><td class="num">${o.totalBillValue}</td>`;
+    if (o.isDuplicate) tr.className = "dup-row";
+    const statusChip = o.isDuplicate
+      ? '<span class="chip cancelled">Duplicate</span>'
+      : '<span class="chip dispatched">New</span>';
+    tr.innerHTML = `<td>${o.docketNo}</td><td>${o.orderDate}</td><td>${o.roomOrBillNo}</td><td>${o.serviceType.name}</td><td class="num">${o.totalPieces}</td><td class="num">${o.totalBillValue}</td><td>${statusChip}</td>`;
     tbody.appendChild(tr);
   });
 }
@@ -573,21 +592,29 @@ document.getElementById("import-sort-date").addEventListener("click", () => {
 document.getElementById("btn-confirm-import").addEventListener("click", async () => {
   const status = document.getElementById("import-status");
   const btn = document.getElementById("btn-confirm-import");
-  if (visibleImport.length === 0) { status.textContent = "No bills in the current filter to import."; return; }
+  const toCreate = visibleImport.filter((o) => !o.isDuplicate);
+  const skipped = visibleImport.length - toCreate.length;
+  if (toCreate.length === 0) {
+    status.textContent = skipped > 0 ? `All ${skipped} bills already exist — nothing to import.` : "No bills in the current filter to import.";
+    return;
+  }
   btn.disabled = true;
-  status.textContent = `Assigning ${visibleImport.length} unique codes…`;
+  status.textContent = `Assigning ${toCreate.length} unique codes…`;
   try {
-    const codes = await generateUniqueCodes(CUSTOMER_ID, visibleImport.length);
-    const toImport = visibleImport.map((o, i) => ({ ...o, uniqueCode: codes[i].uniqueCode, receiptNumber: codes[i].receiptNumber }));
+    const codes = await generateUniqueCodes(CUSTOMER_ID, toCreate.length);
+    const toImport = toCreate.map((o, i) => ({ ...o, uniqueCode: codes[i].uniqueCode, receiptNumber: codes[i].receiptNumber }));
     status.textContent = "Importing…";
     const created = await createOrders(toImport, currentUserEmail);
     status.textContent = `Imported ${created.length} bills. Preparing receipts to print…`;
     await printReceiptsBatch(created);
-    status.textContent = `Imported ${created.length} bills and printed a receipt for each.`;
+    status.textContent = skipped > 0
+      ? `Imported ${created.length} bills and printed a receipt for each — skipped ${skipped} already in the system.`
+      : `Imported ${created.length} bills and printed a receipt for each.`;
     document.getElementById("import-preview").classList.add("hidden");
     document.getElementById("import-file").value = "";
     pendingImport = [];
     visibleImport = [];
+    existingBillKeys = new Set();
   } catch (err) {
     status.textContent = "Import failed — check connection and try again.";
   } finally {
