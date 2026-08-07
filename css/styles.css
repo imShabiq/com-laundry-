@@ -287,6 +287,24 @@ tbody tr:hover{background:var(--accent-wash);}
 .modal-totals{display:flex; justify-content:flex-end; gap:24px; padding:12px 0; font-size:14px;}
 .modal-totals b{font-size:16px;}
 .modal-actions{display:flex; gap:10px; justify-content:flex-end; margin-top:10px;}
+
+/* ---------- Toasts ---------- */
+#toast-container{
+  position:fixed; bottom:20px; right:20px; z-index:100;
+  display:flex; flex-direction:column; gap:8px; max-width:340px;
+}
+.toast{
+  background:var(--ink); color:#fff; padding:11px 16px; border-radius:8px;
+  font-size:13.5px; font-weight:600; box-shadow:0 6px 20px rgba(27,36,41,0.18);
+  opacity:0; transform:translateY(8px); transition:opacity .2s ease, transform .2s ease;
+  display:flex; align-items:center; gap:8px;
+}
+.toast.show{opacity:1; transform:translateY(0);}
+.toast::before{content:"●"; font-size:10px;}
+.toast.toast-success{background:var(--green);}
+.toast.toast-success::before{color:#fff;}
+.toast.toast-error{background:var(--red);}
+.toast.toast-info{background:var(--ink);}
 .modal-status-row{display:flex; gap:14px; align-items:flex-end; margin-top:22px; padding-top:18px; border-top:1px solid var(--line);}
 #bm-status-msg{font-size:13px; margin-top:8px; min-height:1em;}
 #bm-status-msg.ok{color:var(--green);}

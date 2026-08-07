@@ -52,6 +52,47 @@ watchAuth(async (user) => {
   }
 });
 
+// ---------- Toasts ----------
+function showToast(message, type = "info") {
+  const container = document.getElementById("toast-container");
+  const toast = document.createElement("div");
+  toast.className = `toast toast-${type}`;
+  toast.textContent = message;
+  container.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add("show"));
+  setTimeout(() => {
+    toast.classList.remove("show");
+    setTimeout(() => toast.remove(), 250);
+  }, 3800);
+}
+
+// ---------- Confirm dialog ----------
+function confirmDialog(message, { title = "Are you sure?", confirmLabel = "Confirm" } = {}) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById("confirm-modal");
+    document.getElementById("confirm-title").textContent = title;
+    document.getElementById("confirm-message").textContent = message;
+    const okBtn = document.getElementById("confirm-ok");
+    const cancelBtn = document.getElementById("confirm-cancel");
+    okBtn.textContent = confirmLabel;
+    modal.classList.remove("hidden");
+
+    const cleanup = (result) => {
+      modal.classList.add("hidden");
+      okBtn.removeEventListener("click", onOk);
+      cancelBtn.removeEventListener("click", onCancel);
+      modal.removeEventListener("click", onBackdrop);
+      resolve(result);
+    };
+    const onOk = () => cleanup(true);
+    const onCancel = () => cleanup(false);
+    const onBackdrop = (e) => { if (e.target === modal) cleanup(false); };
+    okBtn.addEventListener("click", onOk);
+    cancelBtn.addEventListener("click", onCancel);
+    modal.addEventListener("click", onBackdrop);
+  });
+}
+
 // ---------- Global search (also the "scan anywhere" QR lookup) ----------
 const globalSearch = document.getElementById("global-search");
 const searchResults = document.getElementById("search-results");
@@ -437,13 +478,13 @@ document.getElementById("btn-save-print").addEventListener("click", async () => 
     };
     order.id = await createOrder(order);
     printReceipt(order);
-    saveMsg.textContent = `Saved — ${uniqueCode}`;
-    saveMsg.className = "ok";
+    saveMsg.textContent = "";
+    showToast(`Bill saved — ${uniqueCode}`, "success");
     resetForm();
     refreshOrders();
   } catch (err) {
-    saveMsg.textContent = "Could not save — check connection and try again.";
-    saveMsg.className = "err";
+    saveMsg.textContent = "";
+    showToast("Could not save bill — check connection and try again.", "error");
   } finally {
     btn.disabled = false;
   }
@@ -583,13 +624,15 @@ document.getElementById("btn-confirm-import").addEventListener("click", async ()
     const created = await createOrders(toImport, currentUserEmail);
     status.textContent = `Imported ${created.length} bills. Preparing receipts to print…`;
     await printReceiptsBatch(created);
-    status.textContent = `Imported ${created.length} bills and printed a receipt for each.`;
+    status.textContent = "";
+    showToast(`Imported ${created.length} bills — a receipt printed for each.`, "success");
     document.getElementById("import-preview").classList.add("hidden");
     document.getElementById("import-file").value = "";
     pendingImport = [];
     visibleImport = [];
   } catch (err) {
-    status.textContent = "Import failed — check connection and try again.";
+    status.textContent = "";
+    showToast("Import failed — check connection and try again.", "error");
   } finally {
     btn.disabled = false;
   }
@@ -673,16 +716,16 @@ document.getElementById("btn-save-packing").addEventListener("click", async () =
   try {
     await savePacking(scannedOrder.id, packetCount, currentUserEmail);
     await printStickers(scannedOrder, packetCount);
-    msg.textContent = `Saved — ${packetCount} sticker${packetCount === 1 ? "" : "s"} printed. Marked packed.`;
-    msg.className = "ok";
+    msg.textContent = "";
+    showToast(`Packed — ${packetCount} sticker${packetCount === 1 ? "" : "s"} printed.`, "success");
     document.getElementById("pack-bill-detail").classList.add("hidden");
     document.getElementById("scan-status").textContent = "";
     scannedOrder = null;
     scanInput.value = "";
     scanInput.focus();
   } catch (err) {
-    msg.textContent = "Could not save packing — check connection and try again.";
-    msg.className = "err";
+    msg.textContent = "";
+    showToast("Could not save packing — check connection and try again.", "error");
   } finally {
     btn.disabled = false;
   }
@@ -882,18 +925,22 @@ document.getElementById("bm-status-save").addEventListener("click", async () => 
   if (!modalOrder) return;
   const stage = document.getElementById("bm-status-select").value;
   const remarks = document.getElementById("bm-status-remarks").value.trim();
-  msg.textContent = "Saving…";
-  msg.className = "";
+
+  const ok = await confirmDialog(
+    `Change Room / bill ${modalOrder.roomOrBillNo} from ${statusLabel(modalOrder.status)} to ${statusLabel(stage)}?`,
+    { title: "Change status", confirmLabel: "Change status" }
+  );
+  if (!ok) return;
+
+  msg.textContent = "";
   try {
     await changeOrderStatus(modalOrder.id, stage, currentUserEmail, remarks);
     modalOrder.status = stage;
-    msg.textContent = `Status updated to ${statusLabel(stage)}.`;
-    msg.className = "ok";
+    showToast(`Status updated to ${statusLabel(stage)}.`, "success");
     loadBillHistory(modalOrder.id);
     refreshOrders();
   } catch (err) {
-    msg.textContent = "Could not update status — check connection and try again.";
-    msg.className = "err";
+    showToast("Could not update status — check connection and try again.", "error");
   }
 });
 
@@ -975,6 +1022,13 @@ document.getElementById("btn-create-transfer").addEventListener("click", async (
   if (chosen.length === 0) { msg.textContent = "Tick at least one bill."; msg.className = "err"; return; }
   if (!driverName) { msg.textContent = "Enter a driver name."; msg.className = "err"; return; }
 
+  const totalPackets = chosen.reduce((s, o) => s + (o.packetCount || 0), 0);
+  const ok = await confirmDialog(
+    `Dispatch ${chosen.length} bill${chosen.length === 1 ? "" : "s"} (${totalPackets} packets) with ${driverName}${destinationOutlet ? ` to ${destinationOutlet}` : ""}? This marks them all as Dispatched.`,
+    { title: "Create Dispatch", confirmLabel: "Create Dispatch" }
+  );
+  if (!ok) return;
+
   btn.disabled = true;
   msg.textContent = "Creating dispatch…";
   msg.className = "";
@@ -985,15 +1039,15 @@ document.getElementById("btn-create-transfer").addEventListener("click", async (
       orders: chosen, dispatchedBy: currentUserEmail,
     });
     await printTransferNote(note, chosen);
-    msg.textContent = `Transfer note ${note.transferNo} created — ${chosen.length} bills dispatched.`;
-    msg.className = "ok";
+    msg.textContent = "";
+    showToast(`Transfer note ${note.transferNo} created — ${chosen.length} bills dispatched.`, "success");
     document.getElementById("tn-driver").value = "";
     document.getElementById("tn-vehicle").value = "";
     document.getElementById("tn-destination").value = "";
     await refreshTransferTab();
   } catch (err) {
-    msg.textContent = "Could not create dispatch — check connection and try again.";
-    msg.className = "err";
+    msg.textContent = "";
+    showToast("Could not create dispatch — check connection and try again.", "error");
   } finally {
     btn.disabled = false;
   }
